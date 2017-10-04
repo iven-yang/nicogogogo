@@ -1,0 +1,24 @@
+<html>
+<head>
+  
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+<form action="/loginAuth" method="POST">
+	<input type="text" name = "Username" id="Username" placeholder="username" required/> </br>
+	<input type="password" name = "Password" id="Password" placeholder="password" required/></br>
+	<input type="submit" value = Login />
+	{% if error %}
+		<p class="error"><strong>Error:</strong> {{error}}</p>
+	{% endif %}
+</form>
+
+<a href="/">Go back</a>
+
+</body>
+
+
+</html>

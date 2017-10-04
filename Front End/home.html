@@ -1,0 +1,162 @@
+<html>
+<head>
+    
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+<form action="/post" method="POST">
+	<h1>Welcome {{username}}</h1> 
+	<input type="text" name = "blog" placeholder="post" required/> </br>
+	<input type="submit" value = Post />
+</form>
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<table>
+	<th>Time</th>
+	<th>Post</th>
+
+{% for line in posts %}
+	<tr>
+		<td>{{line.ts}}</td>
+		<td>{{line.blog_post}}</td>
+	</tr>
+{% endfor %}
+</table>
+
+<div>
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-top:100px; margin-left:300px;">Upcoming Events You Have</h1>
+<table style="margin-left:40px;">
+	<th>Name</th>
+	<th>About</th>
+	<th>Start Time</th>
+	<th>Location</th>
+	<th>Zipcode</th>
+{% for line in upevents %}
+	<tr>
+		<td>{{line.title}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.start_time}}</td>
+		<td>{{line.location_name}}</td>
+		<td>{{line.zipcode}}</td>
+	</tr>
+{% endfor %}
+</table>
+</div>
+
+<div style="margin-top:50px;">
+<a href="/home/browse">See Upcoming Events of Interest</a>
+</div>
+
+<div style="margin-top:20px;">
+<a href="/home/frievents">See Upcoming Events of Friends</a>
+</div>
+
+<h1 style="margin-top:100px; margin-left:300px;">Rate a Previous Event</h1>
+<div>
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-top:20px; margin-left:340px;font-size:150%">Events You Have Attended</h1>
+<table style="margin-left:40px;">
+	<th>Event ID</th>
+	<th>Name</th>
+	<th>About</th>
+	<th>Start Time</th>
+	<th>Location</th>
+	<th>Zipcode</th>
+	<th>Your Rating</th>
+	<th>Average Rating (Last 3 Days)</th>
+{% for line in pastevents %}
+	<tr>
+		<td>{{line.event_id}}</td>
+		<td>{{line.title}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.start_time}}</td>
+		<td>{{line.location_name}}</td>
+		<td>{{line.zipcode}}</td>
+		<td>{{line.rating}}</td>
+		<td>{{line.avg}}</td>
+	</tr>
+{% endfor %}
+</table>
+</div>
+
+<h1 style="margin-top:20px; margin-left:340px;font-size:100%">Average Rating of All Events Hosted by Your Groups (Last 3 Days): {{ratingdata.avg}}</h1>
+
+<form action="/home/rate" method="POST">
+  <dl style="margin-top:30px; margin-left:300px;">
+    <dt>Event ID:
+    <dd><input type=text name=eventid>
+	<dt>Rating 1,2,3,4, or 5:
+    <dd><input type=text name=rating>
+    <dd><input type=submit value="Rate">
+    </dl>
+</form>
+
+<h1 style="margin-top:100px; margin-left:300px;">Groups You Are In</h1>
+<div>
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+<table style="margin-left:40px;">
+	<th>Group ID</th>
+	<th>Name</th>
+	<th>Description</th>
+	<th>Officer?</th>
+{% for line in groups %}
+	<tr>
+		<td>{{line.group_id}}</td>
+		<td>{{line.group_name}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.authorized}}</td>
+	</tr>
+{% endfor %}
+</table>
+</div>
+<form action="/home/createvent" method="POST">
+  <dl style="margin-top:30px; margin-left:300px;">
+    <dt>Group ID:
+    <dd><input type=text name=groupid>
+	<dt>Title:
+    <dd><input type=text name=title>
+	<dt>Description:
+    <dd><input type=text name=description>
+	<dt>"Start Time (YYYY-MM-DD HH:MM:SS):
+    <dd><input type=text name=start>
+	<dt>End Time (YYYY-MM-DD HH:MM:SS):
+    <dd><input type=text name=end>
+	<dt>Location:
+    <dd><input type=text name=location>
+	<dt>Zipcode:
+    <dd><input type=text name=zipcode>
+    <dd><input type=submit value="Create">
+    </dl>
+</form>
+
+
+<div style="margin-top:100px;">
+<a href="/logout">Logout</a>
+</div>
+</body>
+
+
+</html>

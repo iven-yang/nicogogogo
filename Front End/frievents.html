@@ -1,0 +1,72 @@
+<html>
+
+<head>
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-left:300px;">Upcoming Events of Friends</h1>
+<table style="margin-left:40px;">
+	<th>Event ID</th>
+	<th>Name</th>
+	<th>About</th>
+	<th>Start Time</th>
+	<th>Location</th>
+	<th>Zipcode</th>
+{% for line in upevents %}
+	<tr>
+		<td>{{line.event_id}}</td>
+		<td>{{line.title}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.start_time}}</td>
+		<td>{{line.location_name}}</td>
+		<td>{{line.zipcode}}</td>
+	</tr>
+{% endfor %}
+</table>
+
+<h1 style="margin-top:100px; margin-left:300px;">All Upcoming Events</h1>
+<table style="margin-left:40px;">
+	<th>Event ID</th>
+	<th>Name</th>
+	<th>About</th>
+	<th>Start Time</th>
+	<th>Location</th>
+	<th>Zipcode</th>
+{% for line in allevents %}
+	<tr>
+		<td>{{line.event_id}}</td>
+		<td>{{line.title}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.start_time}}</td>
+		<td>{{line.location_name}}</td>
+		<td>{{line.zipcode}}</td>
+	</tr>
+{% endfor %}
+</table>
+
+<div style="margin-top:100px;">
+<form action="/home/browse/signup" method="POST">
+<h1 style="margin-left:300px;">Sign Up for an Event</h1> 
+  <dl style="margin-left:300px;">
+    <dt>Event ID:
+    <dd><input type=text name=eventid>
+    <dd><input type=submit value="Sign Up">
+    </dl>
+</form>
+</div>
+
+<a href="/home">Home</a>
+
+</body>
+</html>

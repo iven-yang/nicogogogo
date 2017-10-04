@@ -1,0 +1,28 @@
+<html>
+<head>
+    
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+<form action="/registerAuth" method="POST">
+	<input type="text" name = "Username" id="Username" placeholder="username" required/> </br>
+	<input type="password" name = "Password" id="Password" placeholder="password" required/></br>
+	<input type="text" name = "Firstname" id="Firstname" placeholder="First name" required/> </br>
+	<input type="text" name = "Lastname" id="Lastname" placeholder="Last name" required/></br>
+	<input type="text" name = "e-mail" id="e-mail" placeholder="e-mail" required/> </br>
+	<input type="text" name = "zipcode" id="zipcode" placeholder="zipcode" required/></br>
+	<input type="submit" value = Register />
+	{% if error %}
+		<p class="error"><strong>Error:</strong> {{error}}</p>
+	{% endif %}
+</form>
+
+<a href="/">Go back</a>
+
+</body>
+
+
+</html>
