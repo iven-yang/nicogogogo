@@ -3,7 +3,6 @@ package main
 import (
     "fmt"
     "time"
-    "html"
     "html/template"
     "log"
     "net/http"
@@ -23,7 +22,14 @@ type User struct {
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello %q", html.EscapeString(r.URL.Path))
+	// return HTML page to user
+	if r.Method == "GET" {
+        t, err := template.ParseFiles("index.html")
+		if err != nil {
+			log.Fatal("index: ", err)
+		}
+        t.Execute(w, "")
+    }
 }
 
 func register(w http.ResponseWriter, r *http.Request) {
