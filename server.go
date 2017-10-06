@@ -157,6 +157,11 @@ func home(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func logout(w http.ResponseWriter, r *http.Request) {
+	// logout stuff
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 var db = map[string]*User{}
 
 func main() {
@@ -171,6 +176,9 @@ func main() {
 	
 	// home page (after logging in)
 	http.HandleFunc("/home", home)
+	
+	// logout page
+	http.HandleFunc("/logout", logout)
 	
     err := http.ListenAndServe(":8081", nil)
 	
