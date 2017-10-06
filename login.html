@@ -1,21 +1,22 @@
 <html>
-<head>
-  
-    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
- 
-    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
- 
-</head>
-<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
-<form action="/login" method="POST">
-	<input type="text" name = "Username" id="Username" placeholder="username" required/> </br>
-	<input type="password" name = "Password" id="Password" placeholder="password" required/></br>
-	<input type="submit" value = Login />
-</form>
+	<head>
+	  
+		<link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+	 
+		<link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+	 
+	</head>
+	
+	<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+		<form action="/login" method="POST">
+			<p><strong>Log In</strong> </p> </br>
+			<input type="text" name = "Username" id="Username" placeholder="username" required/> </br>
+			<input type="password" name = "Password" id="Password" placeholder="password" required/></br>
+			<input type="submit" value = Login /> </br> </br>
+			<p class="error"><strong>{{.}}</strong> </p>
+		</form>
 
-<a href="/">Go back</a>
+	<a href="/">Home</a>
 
-</body>
-
-
+	</body>
 </html>
