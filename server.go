@@ -99,8 +99,11 @@ func main() {
 	// register page
 	http.HandleFunc("/register", register)
 	
-	//login page
+	// login page
     http.HandleFunc("/login", login)
+	
+	// home page (after login)
+	http.HandleFunc("/home", login)
 
     err := http.ListenAndServe(":8081", nil)
 	
