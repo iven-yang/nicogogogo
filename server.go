@@ -141,8 +141,19 @@ func login(w http.ResponseWriter, r *http.Request) {
             // create session
             // everything ok, log them in
             fmt.Println("Login successful")
-            http.Redirect(w, r, "/", http.StatusSeeOther)
+            http.Redirect(w, r, "/home", http.StatusSeeOther)
         }
+    }
+}
+
+func home(w http.ResponseWriter, r *http.Request) {
+    // return HTML page to user
+    if r.Method == "GET" {
+        t, err := template.ParseFiles("home.html")
+            if err != nil {
+                log.Fatal("home: ", err)
+            }
+        t.Execute(w, "Welcome User")
     }
 }
 
@@ -159,6 +170,7 @@ func main() {
     http.HandleFunc("/login", login)
 	
 	// home page (after logging in)
+	http.HandleFunc("/home", home)
 	
     err := http.ListenAndServe(":8081", nil)
 	
