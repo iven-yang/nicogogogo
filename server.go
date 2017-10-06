@@ -26,44 +26,56 @@ func index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello %q", html.EscapeString(r.URL.Path))
 }
 
-func register(w http.ResponseWriter, r *http.Request) {	
-	if r.Method == "GET" { // return HTML page to user
+func register(w http.ResponseWriter, r *http.Request) {
+	// return HTML page to user
+	if r.Method == "GET" {
         t, err := template.ParseFiles("register.html")
 		if err != nil {
 			log.Fatal("login: ", err)
 		}
         t.Execute(w, "")
-    } else { // get user input
+    } else {
+		// get user input
         r.ParseForm()
         fmt.Println("New User: username = ", r.Form["Username"], ", password = ", r.Form["Password"])
-		if true { // check if username is available
+		
+		// check if username is available
+		if true {
+			// username taken
 			t, err := template.ParseFiles("register.html")
 			if err != nil {
 				log.Fatal("login: ", err)
 			}
 			t.Execute(w, "Error: username not available")
-		} else{ // everything ok, redirect to login page
+		} else{
+			// everything ok, redirect to login page
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 		}
     }
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
-    if r.Method == "GET" { // return HTML page to user
+	// return HTML page to user
+    if r.Method == "GET" {
         t, err := template.ParseFiles("login.html")
 		if err != nil {
 			log.Fatal("login: ", err)
 		}
         t.Execute(w, "")
-    } else { // get user input
+    } else {
+		// get user input
         r.ParseForm()
-		if true { // check username and password
+		
+		// authenticate username and password
+		if true {
+			// authentication failed
 			t, err := template.ParseFiles("login.html")
 			if err != nil {
 				log.Fatal("login: ", err)
 			}
 			t.Execute(w, "Error: username or password incorrect")
-		} else{ // everything ok, log them in
+		} else{
+			// everything ok, log them in
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 		}
     }
