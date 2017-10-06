@@ -112,9 +112,17 @@ func login(w http.ResponseWriter, r *http.Request) {
     } else {
         // get user input
         r.ParseForm()
-        
+
+        u := r.Form["Username"]
+        p := r.Form["Password"]
+        username := strings.Join(u, "")
+        password := strings.Join(p, "")
+
         // authenticate username and password
-        if true {
+        hash := db[username].Hash
+        err := bcrypt.CompareHashAndPassword(hash, []byte(password))
+
+        if err != nil {
             // authentication failed
             t, err := template.ParseFiles("login.html")
             if err != nil {
@@ -122,7 +130,9 @@ func login(w http.ResponseWriter, r *http.Request) {
             }
             t.Execute(w, "Error: username or password incorrect")
         } else {
+            // create session
             // everything ok, log them in
+            fmt.Println("Login successful")
             http.Redirect(w, r, "/", http.StatusSeeOther)
         }
     }
