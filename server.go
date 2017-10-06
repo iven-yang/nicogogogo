@@ -2,11 +2,25 @@ package main
 
 import (
     "fmt"
-	"html"
+    "time"
+    "html"
     "html/template"
     "log"
     "net/http"
 )
+
+type Post struct {
+    Content string
+    Time time.Time
+}
+
+type User struct {
+    Username string
+    Hash string
+    Created time.Time
+    Following []string
+    Posts []Post
+}
 
 func index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello %q", html.EscapeString(r.URL.Path))
