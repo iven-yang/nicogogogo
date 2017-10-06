@@ -1,0 +1,34 @@
+<html>
+<head>
+    
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-left:300px;">Groups</h1>
+<table style="margin-left:40px;">
+	<th>Name</th>
+	<th>Description</th>
+{% for line in groups %}
+	<tr>
+		<td>{{line.group_name}}</td>
+		<td>{{line.description}}</td>
+	</tr>
+{% endfor %}
+</table>
+
+<a href="/">Back</a>
+
+</body>
+
+
+</html>

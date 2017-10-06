@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Python Flask Find Folks</title>
+ 
+ 
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+ 
+</head>
+
+<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
+<h1 style="margin-top:-20px; margin-left:820px;color:#0d47a1;font-family:'Times New Roman',Times,serif;font-weight:bold;font-size:450%;">Find Folks</h1>
+
+{% if not message %}
+	<a href="/login">Login</a>
+	<div></div>
+	<div></div>
+	<a href="/register">Register</a>
+{% endif %}
+
+{% if message %}
+	<a href="/logout">Logout</a>
+	<a href="/remove_account">Remove Account</a>
+	<p class="message">You are logged in {{message}}. You have {{num}} follower(s)</p> </br>
+	<a href="/tweets">View your tweets</a> </br>
+	<a href="/find_people">Find people to follow</a> </br>
+	<a href="/unfollow">Unfollow someone</a> </br>
+	<a href="/view_followed">View people you have followed</a> </br>
+	</br>
+
+        <h4>15 most recent tweets from you and your followers </h4> </br>
+
+	{% for line in tweets%}
+	        <p>{{line}}</p>
+	        <hr>
+	{% endfor %}
+	{% endif %}
+	
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-left:300px;">Events in the Next 3 Days</h1>
+<table style="margin-left:40px;">
+	<th>Name</th>
+	<th>About</th>
+	<th>Start Time</th>
+	<th>Location</th>
+	<th>Zipcode</th>
+{% for line in posts %}
+	<tr>
+		<td>{{line.title}}</td>
+		<td>{{line.description}}</td>
+		<td>{{line.start_time}}</td>
+		<td>{{line.location_name}}</td>
+		<td>{{line.zipcode}}</td>
+	</tr>
+{% endfor %}
+</table>
+
+<div>
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+<h1 style="margin-top:100px; margin-left:300px;">Current Interests</h1>
+<table style="margin-left:300px;">
+	<th>Category</th>
+	<th>Keyword</th>
+{% for line in inters %}
+	<tr>
+		<td>{{line.category}}</td>
+		<td>{{line.keyword}}</td>
+	</tr>
+{% endfor %}
+</table>
+</div>
+
+<form action="/interests" method="POST">
+<h1 style="margin-left:300px;">See Groups Interested In...</h1> 
+  <dl style="margin-left:300px;">
+    <dt>Category:
+    <dd><input type=text name=category>
+    <dt>Keyword:
+    <dd><input type=text name=keyword>
+    <dd><input type=submit value=Go>
+    </dl>
+</form>
+
+<h1 style="margin-top:150px; margin-left:880px;color:#000000;font-size:100%;">Iven Yang 2016</h1>
+</body>
+</html>
