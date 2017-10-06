@@ -6,10 +6,11 @@ import (
     "strings"
     "time"
     "html/template"
+    "math/rand"
     "log"
     "net/http"
     "golang.org/x/crypto/bcrypt"
-	"path"
+    "path"
 )
 
 type Post struct {
@@ -34,6 +35,14 @@ func index(w http.ResponseWriter, r *http.Request) {
             http.ServeFile(w, r, path.Join("./", r.URL.Path))
         }
     }
+}
+
+func GenCookie(username string) http.Cookie {
+    randomValue := make([]byte, 50)
+    rand.Read(randomValue)
+    cookieValue := username + ":" + string(randomValue[:])
+    expire := time.Now().AddDate(0, 0, 1)
+    return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
 
 func register(w http.ResponseWriter, r *http.Request) {
@@ -165,20 +174,21 @@ func logout(w http.ResponseWriter, r *http.Request) {
 var db = map[string]*User{}
 
 func main() {
+    rand.Seed(time.Now().UTC().UnixNano())
     // Main page for people not logged in
     http.HandleFunc("/", index)
 	
     // register page
     http.HandleFunc("/register", register)
 
-	// login page
+    // login page
     http.HandleFunc("/login", login)
 	
-	// home page (after logging in)
-	http.HandleFunc("/home", home)
-	
-	// logout page
-	http.HandleFunc("/logout", logout)
+    // home page (after logging in)
+    http.HandleFunc("/home", home)
+    
+    // logout page
+    http.HandleFunc("/logout", logout)
 	
     err := http.ListenAndServe(":8081", nil)
 	
