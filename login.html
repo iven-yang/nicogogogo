@@ -7,13 +7,10 @@
  
 </head>
 <body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
-<form action="/loginAuth" method="POST">
+<form action="/login" method="POST">
 	<input type="text" name = "Username" id="Username" placeholder="username" required/> </br>
 	<input type="password" name = "Password" id="Password" placeholder="password" required/></br>
 	<input type="submit" value = Login />
-	{% if error %}
-		<p class="error"><strong>Error:</strong> {{error}}</p>
-	{% endif %}
 </form>
 
 <a href="/">Go back</a>

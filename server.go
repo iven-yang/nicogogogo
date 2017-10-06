@@ -15,7 +15,10 @@ func index(w http.ResponseWriter, r *http.Request) {
 func login(w http.ResponseWriter, r *http.Request) {
     fmt.Println("method:", r.Method) //get request method
     if r.Method == "GET" {
-        t, _ := template.ParseFiles("login.html")
+        t, err := template.ParseFiles("login.html")
+		if err != nil {
+			log.Fatal("login: ", err)
+		}
         t.Execute(w, nil)
     } else {
         r.ParseForm()
