@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "errors"
     "strings"
     "time"
     "html/template"
@@ -119,8 +120,14 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := strings.Join(p, "")
 
         // authenticate username and password
-        hash := db[username].Hash
-        err := bcrypt.CompareHashAndPassword(hash, []byte(password))
+        user, ok := db[username]
+        var err error
+        if !ok {
+            err = errors.New("Invalid username.")
+        } else {
+            hash := user.Hash
+            err = bcrypt.CompareHashAndPassword(hash, []byte(password))
+        }
 
         if err != nil {
             // authentication failed
