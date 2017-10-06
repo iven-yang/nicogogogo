@@ -24,11 +24,16 @@ type User struct {
 func index(w http.ResponseWriter, r *http.Request) {
 	// return HTML page to user
 	if r.Method == "GET" {
-        t, err := template.ParseFiles("index.html")
-		if err != nil {
-			log.Fatal("index: ", err)
+		if r.URL.Path == "" || r.URL.Path == "/" {
+			http.ServeFile(w, r, "index.html")
+		} else {
+			http.ServeFile(w, r, r.URL.Path)
 		}
-        t.Execute(w, "")
+        //t, err := template.ParseFiles("index.html")
+		//if err != nil {
+		//	log.Fatal("index: ", err)
+		//}
+        //t.Execute(w, "")
     }
 }
 
