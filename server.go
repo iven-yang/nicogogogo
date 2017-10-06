@@ -9,6 +9,7 @@ import (
     "log"
     "net/http"
     "golang.org/x/crypto/bcrypt"
+	"path"
 )
 
 type Post struct {
@@ -30,7 +31,7 @@ func index(w http.ResponseWriter, r *http.Request) {
         if r.URL.Path == "" || r.URL.Path == "/" {
             http.ServeFile(w, r, "index.html")
         } else {
-            http.ServeFile(w, r, r.URL.Path)
+            http.ServeFile(w, r, path.Join("./", r.URL.Path))
         }
     }
 }
