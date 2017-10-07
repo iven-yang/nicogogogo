@@ -31,6 +31,7 @@ type User struct {
     Posts []*Post
 }
 
+// landing page for people not logged in
 func index(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
@@ -108,7 +109,7 @@ func IsLoggedIn(r *http.Request) bool {
     return false
 }
 
-
+// register for a new account
 func register(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
@@ -236,6 +237,7 @@ func login(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// home page for users who are logged in
 func home(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
 		// Make user log in
@@ -278,6 +280,7 @@ func post(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// look through other users (must be logged in)
 func browse(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
 		// Make user log in
@@ -286,7 +289,7 @@ func browse(w http.ResponseWriter, r *http.Request) {
 		// return HTML page to user
 		t, err := template.ParseFiles("browse.html")
 		if err != nil {
-			log.Fatal("home: ", err)
+			log.Fatal("browse: ", err)
 		}
 		
 		username := getUsername(r)
@@ -305,25 +308,50 @@ func browse(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// look at a user's profile (must be logged in)
 func user_profiles(w http.ResponseWriter, r *http.Request) {
 	if !IsLoggedIn(r) {
 		// Make user log in
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-		// return HTML page to user
-		t, err := template.ParseFiles("profiles.html")
-		if err != nil {
-			log.Fatal("home: ", err)
+		// return HTML page with user's info
+		if (r.URL.Path == "/user" || r.URL.Path == "user") || (path.Dir(r.URL.Path) != "/user" && path.Dir(r.URL.Path) != "user") {
+			// path is faulty
+			http.Redirect(w, r, "/home", http.StatusSeeOther)
 		}
+		// username of current profile you are looking at
+		username := path.Base(r.URL.Path)
 		
-		username := getUsername(r)
-		
-		varmap := map[string]interface{}{
-            "user": username,
-			"posts": db[username].Posts,
-			"follows": db[username].Follows,
+		// check if user exists
+		if _, ok := db[username]; ok {
+			// User found
+			t, err := template.ParseFiles("profiles.html")
+			if err != nil {
+				log.Fatal("profiles: ", err)
+			}
+			
+			// currently logged in user's username
+			home_username := getUsername(r)
+			
+			followed := "Follow"
+			// check if you are following this user
+			for FUser := range db[home_username].Follows {
+				if db[home_username].Follows[FUser].Username == username {
+					followed = "Unfollow"
+				}
+			}
+			
+			varmap := map[string]interface{}{
+				"user": username,
+				"posts": db[username].Posts,
+				"follows": db[username].Follows,
+				"followed": followed,
+			}
+			t.Execute(w, varmap)
+		} else {
+			// User not found
+			http.Redirect(w, r, "/home", http.StatusSeeOther)
 		}
-		t.Execute(w, varmap)
     }
 }
 
@@ -364,7 +392,7 @@ func main() {
 	http.HandleFunc("/browse", browse)
 	
 	// looking at a user's profile
-	http.HandleFunc("/uesr", user_profiles)
+	http.HandleFunc("/user/", user_profiles)
 	
     // logout page
     http.HandleFunc("/logout", logout)

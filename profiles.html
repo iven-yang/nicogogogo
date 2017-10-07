@@ -7,9 +7,10 @@
 	 
 	</head>
 	<body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
-		<form action="/post" method="POST">
+		<form action="/follow" method="POST">
 			<h1 style = "margin-left:50; margin-top: 50">{{.user}}</h1> <div></div>
-			<input type="submit" style = "margin-left: 100" value=Follow></input>
+			<input type="submit" style = "margin-left: 100" value={{.followed}}></input>
+			<input type="text" style = "margin-top:50; margin-left: 100; visibility: hidden" name = "usrname" value={{.user}} required/>
 		</form>
 
 		<style type="text/css">
