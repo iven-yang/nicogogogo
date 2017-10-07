@@ -50,14 +50,17 @@ func GenCookie(username string) http.Cookie {
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
 
+// Get the username of the user currently making the request
 func getUsername(r *http.Request) string {
-	cookie, err := r.Cookie("SessionID")
-	if err == nil {
-		fullSessionID := cookie.Value
+	if IsLoggedIn(r){
+		cookie, err := r.Cookie("SessionID")
+		if err == nil {
+			fullSessionID := cookie.Value
 
-		// Split the sessionID to Username and ID (username+random)        
-		if len(fullSessionID) >= len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
-			return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
+			// Split the sessionID to Username and ID (username+random)        
+			if len(fullSessionID) >= len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
+				return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
+			}
 		}
 	}
 	return ""
