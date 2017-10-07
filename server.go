@@ -77,6 +77,7 @@ func GetSessionID(username string) (string, error) {
     return user.SessionID, nil
 }
 
+// Is the user logged in
 func IsLoggedIn(r *http.Request) bool {
 
     cookie, err := r.Cookie("SessionID")
@@ -237,7 +238,7 @@ func login(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-// home page for users who are logged in
+// home page for users (must be logged in)
 func home(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
 		// Make user log in
@@ -260,7 +261,7 @@ func home(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-// User makes a status post
+// User makes a status post (must be logged in)
 func post(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -335,9 +336,10 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
 			
 			followed := "Follow"
 			// check if you are following this user
-			for FUser := range db[home_username].Follows {
-				if db[home_username].Follows[FUser].Username == username {
+			for _, v := range db[home_username].Follows {
+				if v.Username == username {
 					followed = "Unfollow"
+					break
 				}
 			}
 			
@@ -355,12 +357,51 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// User follows someone else (must be logged in)
+func follow(w http.ResponseWriter, r *http.Request) {
+    if !IsLoggedIn(r) {
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		// username of user who is logged in
+		home_username := getUsername(r)
+		
+		r.ParseForm()
+		u := r.Form["username"]
+		username := strings.Join(u, "")
+		
+		// check to see if user you are "following" exists
+		if _, ok := db[username]; ok {
+			// check to see if you are following this user (if so, unfollow them)
+			following := false
+			for i, v := range db[home_username].Follows {
+				// Unfollow them
+				if v.Username == username {
+					following = true
+					db[home_username].Follows = append(db[home_username].Follows[:i], db[home_username].Follows[i+1:]...)
+					break
+				}
+			}
+			
+			if !following {
+				// Follow them
+				db[home_username].Follows = append(db[home_username].Follows, db[username])
+			}
+		}
+        http.Redirect(w, r, path.Join("/user", username), http.StatusSeeOther)
+    }
+}
+
 func logout(w http.ResponseWriter, r *http.Request) {
-    // logout stuff
-    expire := time.Now().AddDate(0, 0, 1)
-    cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
-    http.SetCookie(w, &cookie)
-    http.Redirect(w, r, "/", http.StatusSeeOther)
+    if !IsLoggedIn(r) {
+		// Make user log in
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		// logout stuff
+		expire := time.Now().AddDate(0, 0, 1)
+		cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+		http.SetCookie(w, &cookie)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
 }
 
 var db = map[string]*User{}
@@ -382,17 +423,20 @@ func main() {
     // login page
     http.HandleFunc("/login", login)
 	
-    // home page (after logging in)
+    // home page (must be logged in)
     http.HandleFunc("/home", home)
 	
-	// posting status messages (after logging in)
+	// posting status messages (must be logged in)
 	http.HandleFunc("/post", post)
 	
-	// browsing through other users
+	// browsing through other users (must be logged in)
 	http.HandleFunc("/browse", browse)
 	
-	// looking at a user's profile
+	// looking at a user's profile (must be logged in)
 	http.HandleFunc("/user/", user_profiles)
+	
+	// following a user (must be logged in)
+	http.HandleFunc("/follow", follow)
 	
     // logout page
     http.HandleFunc("/logout", logout)

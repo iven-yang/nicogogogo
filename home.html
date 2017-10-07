@@ -52,7 +52,9 @@
 			<table style="margin-top:20; margin-left:100px;">
 				<th>Username</th>
 				{{range .follows}}
-					<tr>{{.Username}}</th>
+					<tr>
+						<td> <a href="/user/{{.Username}}">{{.Username}}</a> </td>
+					</tr>
 				{{end}}
 			</table>
 		</div>
