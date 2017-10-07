@@ -252,6 +252,7 @@ func home(w http.ResponseWriter, r *http.Request) {
 		varmap := map[string]interface{}{
             "user": "Welcome " + username,
 			"posts": db[username].Posts,
+			"follows": db[username].Follows,
 		}
 		t.Execute(w, varmap)
     }
@@ -309,6 +310,9 @@ func main() {
 	
 	// posting status messages (after logging in)
 	http.HandleFunc("/post", post)
+	
+	// browsing through other users
+	http.HandleFunc("/browse", post)
 	
     // logout page
     http.HandleFunc("/logout", logout)
