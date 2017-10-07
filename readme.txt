@@ -2,7 +2,7 @@
 A client server web application...
 					with GO!
 
-open shell here
+open shell
 	go run server.go
 
 open web browser

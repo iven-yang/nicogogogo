@@ -305,6 +305,27 @@ func browse(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func user_profiles(w http.ResponseWriter, r *http.Request) {
+	if !IsLoggedIn(r) {
+		// Make user log in
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		// return HTML page to user
+		t, err := template.ParseFiles("profiles.html")
+		if err != nil {
+			log.Fatal("home: ", err)
+		}
+		
+		username := getUsername(r)
+		
+		varmap := map[string]interface{}{
+            "user": username,
+			"posts": db[username].Posts,
+			"follows": db[username].Follows,
+		}
+		t.Execute(w, varmap)
+    }
+}
 
 func logout(w http.ResponseWriter, r *http.Request) {
     // logout stuff
@@ -341,6 +362,9 @@ func main() {
 	
 	// browsing through other users
 	http.HandleFunc("/browse", browse)
+	
+	// looking at a user's profile
+	http.HandleFunc("/uesr", user_profiles)
 	
     // logout page
     http.HandleFunc("/logout", logout)
