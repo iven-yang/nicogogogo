@@ -99,7 +99,7 @@ func IsLoggedIn(r *http.Request) bool {
     }
 
     // Check if the stored session id and the bearer session id match
-    fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
+    // fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
     if fullSessionID == savedSessionID {
 		// If you want to be really secure check IP
 		return true
@@ -236,10 +236,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func home(w http.ResponseWriter, r *http.Request) {
-    // return HTML page to user
     if !IsLoggedIn(r) {
+		// Make user log in
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
+		// return HTML page to user
 		t, err := template.ParseFiles("home.html")
 		if err != nil {
 			log.Fatal("home: ", err)
@@ -255,13 +256,16 @@ func home(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// User makes a status post
 func post(w http.ResponseWriter, r *http.Request) {
-    // return HTML page to user
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
 		username := getUsername(r)
+		
+		r.ParseForm()
 		p_d := r.Form["status"]
+		
 		post_data := strings.Join(p_d, "")
 		if len(post_data) > 0 {
 			new_post := Post{Content: post_data, Time: time.Now()}
