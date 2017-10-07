@@ -7,8 +7,8 @@
  
 </head>
 <body style="margin-top:20px; margin-left:20px;background-color:#90caf9;">
-<form action="/home" method="POST">
-	<h1 style = "margin-left:50; margin-top: 50">{{.}}</h1> <div></div>
+<form action="/post" method="POST">
+	<h1 style = "margin-left:50; margin-top: 50">{{.user}}</h1> <div></div>
 	<input type="text" style = "margin-top:50; margin-left: 100" name = "status" placeholder="Status Post" required/> </br>
 	<input type="submit" style = "margin-left: 100" value = Post />
 </form>
@@ -22,6 +22,13 @@
 <table style = "margin-top:50; margin-left: 100" >
 	<th>Time</th>
 	<th>Post</th>
+	
+{{range .posts}}
+	<tr>
+		<td>{{.Time}}</td>
+		<td>{{.Content}}</td>
+	</tr>
+{{end}}
 </table>
 
 <div>

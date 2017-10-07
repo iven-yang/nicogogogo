@@ -50,6 +50,19 @@ func GenCookie(username string) http.Cookie {
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
 
+func getUsername(r *http.Request) string {
+	cookie, err := r.Cookie("SessionID")
+	if err == nil {
+		fullSessionID := cookie.Value
+
+		// Split the sessionID to Username and ID (username+random)        
+		if len(fullSessionID) >= len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
+			return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
+		}
+	}
+	return ""
+}
+
 func GetSessionID(username string) (string, error) {
     user, ok := db[username]
     if !ok {
@@ -63,7 +76,7 @@ func IsLoggedIn(r *http.Request) bool {
 
     cookie, err := r.Cookie("SessionID")
     if err != nil {
-	return false
+		return false
     }
 
     fullSessionID := cookie.Value
@@ -77,14 +90,14 @@ func IsLoggedIn(r *http.Request) bool {
     savedSessionID, err := GetSessionID(username)
 
     if err != nil {
-	return false
+		return false
     }
 
     // If SessionID matches the expected SessionID, it is Good
     fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
     if fullSessionID == savedSessionID {
-	// If you want to be really secure check IP
-	return true
+		// If you want to be really secure check IP
+		return true
     }
 
     return false
@@ -223,11 +236,35 @@ func home(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-        t, err := template.ParseFiles("home.html")
-            if err != nil {
-                log.Fatal("home: ", err)
+		t, err := template.ParseFiles("home.html")
+		if err != nil {
+			log.Fatal("home: ", err)
+		}
+		
+		username := getUsername(r)
+		
+		varmap := map[string]interface{}{
+            "user": "Welcome " + username,
+			"posts": db[username].Posts,
         }
-        t.Execute(w, "Welcome User")
+		
+		t.Execute(w, varmap)
+    }
+}
+
+func post(w http.ResponseWriter, r *http.Request) {
+    // return HTML page to user
+    if !IsLoggedIn(r) {
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		username := getUsername(r)
+		p_d := r.Form["status"]
+		post_data := strings.Join(p_d, "")
+		if len(post_data) > 0 {
+			new_post := Post{Content: post_data, Time: time.Now()}
+			db[username].Posts = append(db[username].Posts, &new_post)
+		}
+        http.Redirect(w, r, "/home", http.StatusSeeOther)
     }
 }
 
@@ -257,7 +294,10 @@ func main() {
 	
     // home page (after logging in)
     http.HandleFunc("/home", home)
-    
+	
+	// posting status messages (after logging in)
+	http.HandleFunc("/post", post)
+	
     // logout page
     http.HandleFunc("/logout", logout)
 	
