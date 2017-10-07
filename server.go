@@ -18,6 +18,7 @@ const USER_NX = "User does not exist."
 
 type Post struct {
     Content string
+	Timestr string
     Time time.Time
 }
 
@@ -90,7 +91,7 @@ func IsLoggedIn(r *http.Request) bool {
     }
 
     // Extract username from the session id
-    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
+    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 + 1)]
 
     // Get the saved Session ID for the user provided in the cookie
     savedSessionID, err := GetSessionID(username)
@@ -268,7 +269,8 @@ func post(w http.ResponseWriter, r *http.Request) {
 		
 		post_data := strings.Join(p_d, "")
 		if len(post_data) > 0 {
-			new_post := Post{Content: post_data, Time: time.Now()}
+			// Time formatting string guidelines: https://golang.org/src/time/format.go
+			new_post := Post{Content: post_data, Time: time.Now(), Timestr: time.Now().Format("Jan 2 2006: 3:04 pm")}
 			db[username].Posts = append(db[username].Posts, &new_post)
 		}
         http.Redirect(w, r, "/home", http.StatusSeeOther)
