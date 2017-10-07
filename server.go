@@ -13,7 +13,7 @@ import (
     "path"
 )
 
-const COOKIE_LENGTH = 50
+const COOKIE_LENGTH = 25
 const USER_NX = "User does not exist."
 
 type Post struct {
@@ -45,7 +45,7 @@ func GenCookie(username string) http.Cookie {
     // generaate random 50 byte string to use as a session cookie
     randomValue := make([]byte, COOKIE_LENGTH)
     rand.Read(randomValue)
-    cookieValue := username + ":" + string(randomValue[:])
+    cookieValue := username + ":" + fmt.Sprintf("%X", randomValue)
     expire := time.Now().AddDate(0, 0, 1)
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
@@ -68,12 +68,11 @@ func IsLoggedIn(r *http.Request) bool {
 
     fullSessionID := cookie.Value
 
-
     // Split the sessionID to Username and ID (username+random)        
-    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH+1)]
-    sessionID := fullSessionID[len(fullSessionID) - (COOKIE_LENGTH):]
-
-    fmt.Printf("Username: %s; SessionID: %q\n", username, sessionID)
+    if len(fullSessionID) < len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
+        return false
+    }
+    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
 
     savedSessionID, err := GetSessionID(username)
 
@@ -82,6 +81,7 @@ func IsLoggedIn(r *http.Request) bool {
     }
 
     // If SessionID matches the expected SessionID, it is Good
+    fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
     if fullSessionID == savedSessionID {
 	// If you want to be really secure check IP
 	return true
@@ -94,11 +94,16 @@ func IsLoggedIn(r *http.Request) bool {
 func register(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
-        t, err := template.ParseFiles("register.html")
-            if err != nil {
-                log.Fatal("login: ", err)
-            }
-        t.Execute(w, "")
+        if IsLoggedIn(r) {
+            fmt.Println("Continuing session")
+            http.Redirect(w, r, "/home", http.StatusSeeOther)
+        } else {
+            t, err := template.ParseFiles("register.html")
+                if err != nil {
+                    log.Fatal("login: ", err)
+                }
+            t.Execute(w, "")
+        }
     } else {
         // get user input
         r.ParseForm()
@@ -164,11 +169,17 @@ func register(w http.ResponseWriter, r *http.Request) {
 func login(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
-        t, err := template.ParseFiles("login.html")
-            if err != nil {
-                log.Fatal("login: ", err)
-            }
-        t.Execute(w, "")
+        if IsLoggedIn(r) {
+            fmt.Println("Continuing session")
+            http.Redirect(w, r, "/home", http.StatusSeeOther)
+        } else {
+            fmt.Println("Cookie does not match")
+            t, err := template.ParseFiles("login.html")
+                if err != nil {
+                    log.Fatal("login: ", err)
+                }
+            t.Execute(w, "")
+        }
     } else {
         // get user input
         r.ParseForm()
@@ -197,6 +208,9 @@ func login(w http.ResponseWriter, r *http.Request) {
             t.Execute(w, "Error: username or password incorrect")
         } else {
             // create session
+            cookie := GenCookie(username)
+            db[username].SessionID = cookie.Value
+            http.SetCookie(w, &cookie)
             // everything ok, log them in
             fmt.Println("Login successful")
             http.Redirect(w, r, "/home", http.StatusSeeOther)
@@ -206,23 +220,15 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 func home(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
-    if r.Method == "GET" {
+    if !IsLoggedIn(r) {
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
         t, err := template.ParseFiles("home.html")
             if err != nil {
                 log.Fatal("home: ", err)
-            }
-        t.Execute(w, "Welcome User")
-    } else {
-		// User made a status post
-		r.ParseForm()
-		
-		sp, ok := r.Form["status"]
-		status_post := strings.Join(sp, "")
-        if ok && len(status_post) > 0 {
-            // user = db[username]
-			// append(user.Posts, status_post)
         }
-	}
+        t.Execute(w, "Welcome User")
+    }
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
