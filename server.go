@@ -154,7 +154,17 @@ func home(w http.ResponseWriter, r *http.Request) {
                 log.Fatal("home: ", err)
             }
         t.Execute(w, "Welcome User")
-    }
+    } else {
+		// User made a status post
+		r.ParseForm()
+		
+		sp, ok := r.Form["status"]
+		status_post := strings.Join(sp, "")
+        if ok && len(status_post) > 0 {
+            // user = db[username]
+			// append(user.Posts, status_post)
+        }
+	}
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
