@@ -278,6 +278,34 @@ func post(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func browse(w http.ResponseWriter, r *http.Request) {
+    if !IsLoggedIn(r) {
+		// Make user log in
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		// return HTML page to user
+		t, err := template.ParseFiles("browse.html")
+		if err != nil {
+			log.Fatal("home: ", err)
+		}
+		
+		username := getUsername(r)
+		
+		other_users := make([]User, len(db)-1)
+		for usr := range db {
+			if usr != username {
+				other_users = append(other_users, *db[usr])
+			}
+		}
+		
+		varmap := map[string]interface{}{
+            "users": other_users,
+		}
+		t.Execute(w, varmap)
+    }
+}
+
+
 func logout(w http.ResponseWriter, r *http.Request) {
     // logout stuff
     expire := time.Now().AddDate(0, 0, 1)
@@ -312,7 +340,7 @@ func main() {
 	http.HandleFunc("/post", post)
 	
 	// browsing through other users
-	http.HandleFunc("/browse", post)
+	http.HandleFunc("/browse", browse)
 	
     // logout page
     http.HandleFunc("/logout", logout)
