@@ -68,25 +68,25 @@ func IsLoggedIn(r *http.Request) bool {
 
     fullSessionID := cookie.Value
 
-    // Split the sessionID to Username and ID (username+random)        
-    if len(fullSessionID) < len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
+    // Check if cookie is larger than the minimum cookie length
+    if len(fullSessionID) <= (COOKIE_LENGTH * 2 + 1) {
         return false
     }
+
+    // Extract username from the session id
     username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
 
+    // Get the saved Session ID for the user provided in the cookie
     savedSessionID, err := GetSessionID(username)
-
     if err != nil {
 	return false
     }
 
-    // If SessionID matches the expected SessionID, it is Good
+    // Check if the stored session id and the bearer session id match
     fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
     if fullSessionID == savedSessionID {
-	// If you want to be really secure check IP
 	return true
     }
-
     return false
 }
 
@@ -224,16 +224,19 @@ func home(w http.ResponseWriter, r *http.Request) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
         t, err := template.ParseFiles("home.html")
-            if err != nil {
-                log.Fatal("home: ", err)
+        if err != nil {
+            log.Fatal("home: ", err)
         }
         t.Execute(w, "Welcome User")
     }
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
-	// logout stuff
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+    // logout stuff
+    expire := time.Now().AddDate(0, 0, 1)
+    cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+    http.SetCookie(w, &cookie)
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 var db = map[string]*User{}
