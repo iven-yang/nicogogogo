@@ -13,6 +13,9 @@ import (
     "path"
 )
 
+const COOKIE_LENGTH = 50
+const USER_NX = "User does not exist."
+
 type Post struct {
     Content string
     Time time.Time
@@ -21,6 +24,7 @@ type Post struct {
 type User struct {
     Username string
     Hash []byte
+    SessionID string
     Created time.Time
     Follows []*User
     Posts []*Post
@@ -38,12 +42,54 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 func GenCookie(username string) http.Cookie {
-    randomValue := make([]byte, 50)
+    // generaate random 50 byte string to use as a session cookie
+    randomValue := make([]byte, COOKIE_LENGTH)
     rand.Read(randomValue)
     cookieValue := username + ":" + string(randomValue[:])
     expire := time.Now().AddDate(0, 0, 1)
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
+
+func GetSessionID(username string) (string, error) {
+    user, ok := db[username]
+    if !ok {
+        return "", errors.New(USER_NX)
+    }
+
+    return user.SessionID, nil
+}
+
+func IsLoggedIn(r *http.Request) bool {
+
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
+	return false
+    }
+
+    fullSessionID := cookie.Value
+
+
+    // Split the sessionID to Username and ID (username+random)        
+    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH+1)]
+    sessionID := fullSessionID[len(fullSessionID) - (COOKIE_LENGTH):]
+
+    fmt.Printf("Username: %s; SessionID: %q\n", username, sessionID)
+
+    savedSessionID, err := GetSessionID(username)
+
+    if err != nil {
+	return false
+    }
+
+    // If SessionID matches the expected SessionID, it is Good
+    if fullSessionID == savedSessionID {
+	// If you want to be really secure check IP
+	return true
+    }
+
+    return false
+}
+
 
 func register(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
@@ -59,7 +105,8 @@ func register(w http.ResponseWriter, r *http.Request) {
 
         // check if username and password exist in form data
         u, ok := r.Form["Username"]
-        username := strings.Join(u, "")
+        display := strings.Join(u, "")
+        username := strings.ToLower(display)
         if !ok || len(username) < 1 {
             // please enter a username
             t, err := template.ParseFiles("register.html")
@@ -99,7 +146,9 @@ func register(w http.ResponseWriter, r *http.Request) {
                 log.Fatal("registration: ", err)
             }
 
-            newUser := User{Username: username, Hash: hash, Created: time.Now(), Posts: []*Post{}, Follows: []*User{}}
+            cookie := GenCookie(username)
+
+            newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []*User{}}
             db[username] = &newUser
             // everything ok, redirect to login page
             http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -126,14 +175,14 @@ func login(w http.ResponseWriter, r *http.Request) {
 
         u := r.Form["Username"]
         p := r.Form["Password"]
-        username := strings.Join(u, "")
+        username := strings.ToLower(strings.Join(u, ""))
         password := strings.Join(p, "")
 
         // authenticate username and password
         user, ok := db[username]
         var err error
         if !ok {
-            err = errors.New("Invalid username.")
+            err = errors.New(USER_NX)
         } else {
             hash := user.Hash
             err = bcrypt.CompareHashAndPassword(hash, []byte(password))
@@ -185,6 +234,12 @@ var db = map[string]*User{}
 
 func main() {
     rand.Seed(time.Now().UTC().UnixNano())
+
+    // test cookie generation ***REMOVE***
+    s := GenCookie("test")
+    _ = s
+    // ***REMOVE***
+
     // Main page for people not logged in
     http.HandleFunc("/", index)
 	
