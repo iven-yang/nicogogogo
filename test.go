@@ -11,8 +11,5 @@ func main() {
                                   Data: map[string]string{},
                                  }
     testRequest.Data["asdf"] = "test"
-    fmt.Println(common.LOGIN)
-    fmt.Println(testRequest.SessionID)
-    fmt.Println(testRequest.Action)
-    fmt.Println(testRequest.Data["asdf"])
+    fmt.Println(testRequest)
 }

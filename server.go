@@ -287,18 +287,18 @@ func post(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-		username := getUsername(r)
-		
-		r.ParseForm()
-		p_d := r.Form["status"]
-		
-		post_data := strings.Join(p_d, "")
-		
-		if len(post_data) > 0 && len(post_data) < 101{
-			// Time formatting string guidelines: https://golang.org/src/time/format.go
-			new_post := Post{Content: post_data, Time: time.Now(), Timestr: time.Now().Format("Jan 2 2006: 3:04 pm")}
-			db[username].Posts = append(db[username].Posts, &new_post)
-		}
+        username := getUsername(r)
+        
+        r.ParseForm()
+        p_d := r.Form["status"]
+        
+        post_data := strings.Join(p_d, "")
+        
+        if len(post_data) > 0 && len(post_data) < 101{
+            // Time formatting string guidelines: https://golang.org/src/time/format.go
+            new_post := Post{Content: post_data, Time: time.Now(), Timestr: time.Now().Format("Jan 2 2006: 3:04 pm")}
+            db[username].Posts = append(db[username].Posts, &new_post)
+        }
         http.Redirect(w, r, "/home", http.StatusSeeOther)
     }
 }
@@ -309,25 +309,25 @@ func browse(w http.ResponseWriter, r *http.Request) {
 		// Make user log in
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-		// return HTML page to user
-		t, err := template.ParseFiles("browse.html")
-		if err != nil {
-			log.Fatal("browse: ", err)
-		}
-		
-		username := getUsername(r)
-		
-		other_users := make([]User, len(db)-1)
-		for usr := range db {
-			if usr != username {
-				other_users = append(other_users, *db[usr])
-			}
-		}
-		
-		varmap := map[string]interface{}{
-            "users": other_users,
-		}
-		t.Execute(w, varmap)
+        // return HTML page to user
+        t, err := template.ParseFiles("browse.html")
+        if err != nil {
+            log.Fatal("browse: ", err)
+        }
+        
+        username := getUsername(r)
+        
+        other_users := make([]User, len(db)-1)
+        for usr := range db {
+            if usr != username {
+                other_users = append(other_users, *db[usr])
+            }
+        }
+        
+        varmap := map[string]interface{}{
+    "users": other_users,
+        }
+        t.Execute(w, varmap)
     }
 }
 
@@ -393,31 +393,31 @@ func follow(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-		// username of user who is logged in
-		home_username := getUsername(r)
-		
-		r.ParseForm()
-		u := r.Form["username"]
-		username := strings.Join(u, "")
-		
-		// check to see if user you are "following" exists
-		if _, ok := db[username]; ok {
-			// check to see if you are following this user (if so, unfollow them)
-			following := false
-			for i, v := range db[home_username].Follows {
-				// Unfollow them
-				if v == username {
-					following = true
-					db[home_username].Follows = append(db[home_username].Follows[:i], db[home_username].Follows[i+1:]...)
-					break
-				}
-			}
-			
-			if !following {
-				// Follow them
-				db[home_username].Follows = append(db[home_username].Follows, db[username].Username)
-			}
-		}
+        // username of user who is logged in
+        home_username := getUsername(r)
+        
+        r.ParseForm()
+        u := r.Form["username"]
+        username := strings.Join(u, "")
+        
+        // check to see if user you are "following" exists
+        if _, ok := db[username]; ok {
+            // check to see if you are following this user (if so, unfollow them)
+            following := false
+            for i, v := range db[home_username].Follows {
+                // Unfollow them
+                if v == username {
+                    following = true
+                    db[home_username].Follows = append(db[home_username].Follows[:i], db[home_username].Follows[i+1:]...)
+                    break
+                }
+            }
+            
+            if !following {
+                // Follow them
+                db[home_username].Follows = append(db[home_username].Follows, db[username].Username)
+            }
+        }
         http.Redirect(w, r, path.Join("/user", username), http.StatusSeeOther)
     }
 }
@@ -427,12 +427,12 @@ func logout(w http.ResponseWriter, r *http.Request) {
 		// Make user log in
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
-		// logout stuff
-		expire := time.Now().AddDate(0, 0, 1)
-		cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
-		http.SetCookie(w, &cookie)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-	}
+        // logout stuff
+        expire := time.Now().AddDate(0, 0, 1)
+        cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+        http.SetCookie(w, &cookie)
+        http.Redirect(w, r, "/", http.StatusSeeOther)
+    }
 }
 
 func delete_account(w http.ResponseWriter, r *http.Request) {
@@ -523,17 +523,17 @@ func main() {
     // home page (must be logged in)
     http.HandleFunc("/home", home)
 	
-	// posting status messages (must be logged in)
-	http.HandleFunc("/post", post)
-	
-	// browsing through other users (must be logged in)
-	http.HandleFunc("/browse", browse)
-	
-	// looking at a user's profile (must be logged in)
-	http.HandleFunc("/user/", user_profiles)
-	
-	// following a user (must be logged in)
-	http.HandleFunc("/follow", follow)
+    // posting status messages (must be logged in)
+    http.HandleFunc("/post", post)
+    
+    // browsing through other users (must be logged in)
+    http.HandleFunc("/browse", browse)
+    
+    // looking at a user's profile (must be logged in)
+    http.HandleFunc("/user/", user_profiles)
+    
+    // following a user (must be logged in)
+    http.HandleFunc("/follow", follow)
 	
     // logout page
     http.HandleFunc("/logout", logout)
