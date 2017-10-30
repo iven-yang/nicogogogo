@@ -1,10 +1,10 @@
-package test
+package main
 
 import(
     "fmt"
-    "nicogogogo/request"
+    "niconicogo/common"
 )
 
 func main() {
-    fmt.Println(LOGIN)
+    fmt.Println(common.LOGIN)
 }
