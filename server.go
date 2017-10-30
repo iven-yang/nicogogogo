@@ -252,6 +252,15 @@ func home(w http.ResponseWriter, r *http.Request) {
 		
 		username := getUsername(r)
 		
+		// check to see if followed users' accounts still exist
+		for i, followed := range db[username].Follows {
+			_, ok := db[followed.Username]
+			if !ok {
+				// unfollow user if account doesn't exist
+				db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
+			}
+		}
+		
 		varmap := map[string]interface{}{
             "user": "Welcome " + username,
 			"posts": db[username].Posts,
@@ -343,6 +352,15 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			
+			// check to see if followed users' accounts still exist
+			for i, followed := range db[username].Follows {
+				_, ok := db[followed.Username]
+				if !ok {
+					// unfollow user if account doesn't exist
+					db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
+				}
+			}
+			
 			varmap := map[string]interface{}{
 				"user": username,
 				"posts": db[username].Posts,
@@ -404,6 +422,24 @@ func logout(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func delete_account(w http.ResponseWriter, r *http.Request) {
+    if !IsLoggedIn(r) {
+		// Make user log in
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+    } else {
+		// logout stuff
+		username := getUsername(r)
+		
+		expire := time.Now().AddDate(0, 0, 1)
+		cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+		http.SetCookie(w, &cookie)
+		
+		delete(db, username)
+		
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
 var db = map[string]*User{}
 
 func main() {
@@ -440,6 +476,9 @@ func main() {
 	
     // logout page
     http.HandleFunc("/logout", logout)
+	
+	// delete account
+    http.HandleFunc("/delete_account", delete_account)
 	
     err := http.ListenAndServe(":8081", nil)
 	
