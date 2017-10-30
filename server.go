@@ -281,7 +281,8 @@ func post(w http.ResponseWriter, r *http.Request) {
 		p_d := r.Form["status"]
 		
 		post_data := strings.Join(p_d, "")
-		if len(post_data) > 0 {
+		
+		if len(post_data) > 0 && len(post_data) < 101{
 			// Time formatting string guidelines: https://golang.org/src/time/format.go
 			new_post := Post{Content: post_data, Time: time.Now(), Timestr: time.Now().Format("Jan 2 2006: 3:04 pm")}
 			db[username].Posts = append(db[username].Posts, &new_post)
