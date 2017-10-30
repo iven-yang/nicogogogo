@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
     "errors"
+	"io/ioutil"
     "strings"
     "time"
     "html/template"
@@ -63,7 +64,7 @@ func getUsername(r *http.Request) string {
 
 			// Split the sessionID to Username and ID (username+random)        
 			if len(fullSessionID) >= len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
-				return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 +1)]
+				return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 + 1)]
 			}
 		}
 	}
@@ -157,9 +158,7 @@ func register(w http.ResponseWriter, r *http.Request) {
         fmt.Println("New User: username = ", username, ", password = ", password)
 
         // check if username is available
-        _, ok = db[username]
-		
-		if ok {
+		if db_check_user_exists(username) {
             // username taken
             t, err := template.ParseFiles("register.html")
             if err != nil {
@@ -177,9 +176,11 @@ func register(w http.ResponseWriter, r *http.Request) {
             cookie := GenCookie(username)
 
             newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []string{}}
-			fmt.Println("JSON DATA:")
-			fmt.Println(string(db_user_to_JSON(newUser))[:])
-            db[username] = &newUser
+			
+			// make JSON file for user
+			db_register(newUser)
+			
+			db[username] = &newUser
             // everything ok, redirect to login page
             http.Redirect(w, r, "/login", http.StatusSeeOther)
         }
@@ -256,6 +257,8 @@ func home(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		username := getUsername(r)
+		
+		fmt.Println(db_user_to_JSON(db_JSON_to_user(username)))
 		
 		// check to see if followed users' accounts still exist
 		for i, followed := range db[username].Follows {
@@ -445,12 +448,33 @@ func delete_account(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &cookie)
 		
 		delete(db, username)
+		// remove user's JSON file
+		db_delete_user(username)
 		
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 
-func db_check_user_exists(username string) bool{
+func db_register(user User) {
+	fmt.Println("JSON DATA:")
+	newUserBytes := db_user_to_JSON(user)
+	fmt.Println(string(newUserBytes)[:])
+	writeerr := ioutil.WriteFile(path.Join("db/users", user.Username+".json"), newUserBytes, 0644)
+	if writeerr != nil {
+		panic(writeerr)
+	}
+}
+
+func db_delete_user(username string) {
+	err := os.Remove(path.Join("db/users", username+".json"))
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+	fmt.Println("User Removed: ", username)
+}
+
+func db_check_user_exists(username string) bool {
 	if _, err := os.Stat(path.Join("db/users", username+".json")); !os.IsNotExist(err) {
 		return true
 	}
@@ -459,19 +483,22 @@ func db_check_user_exists(username string) bool{
 
 // converting user struct to JSON string
 func db_user_to_JSON(user User) []byte {
-	JSON_string, _ := json.Marshal(user)
+	JSON_string, _ := json.MarshalIndent(user, "", "    ")
 	return JSON_string
 }
 
 // converting JSON string to user struct
-func db_JSON_to_user(user []byte) {
-	var dat map[string]interface{}
-	if err := json.Unmarshal(user, &dat); err != nil {
-        panic(err)
-    }
-	fmt.Println(dat)
+func db_JSON_to_user(username string) User {
+	dat, err := ioutil.ReadFile(path.Join("db/users", username+".json"))
+	if err != nil {
+		panic(err.Error())
+	}
 	
-	// return User{Username: dat["Username"], Hash: dat["Hash"], SessionID: dat["SessionID"], Created: dat["Created"], Posts: []*Post{}, Follows: []*User{}}
+	var user User
+	if err := json.Unmarshal(dat, &user); err != nil {
+		panic(err)
+	}
+	return user
 }
 
 var db = map[string]*User{}
