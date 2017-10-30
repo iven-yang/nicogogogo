@@ -5,6 +5,8 @@ type Action int
 const(
     LOGIN Action = iota
     LOGOUT
+    REGISTER
+    DELETE
     FOLLOW
     POST
     FEED
