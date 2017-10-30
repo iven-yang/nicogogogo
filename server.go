@@ -2,6 +2,8 @@ package main
 
 import (
     "fmt"
+	"encoding/json"
+	"os"
     "errors"
     "strings"
     "time"
@@ -27,7 +29,7 @@ type User struct {
     Hash []byte
     SessionID string
     Created time.Time
-    Follows []*User
+    Follows []string
     Posts []*Post
 }
 
@@ -156,7 +158,8 @@ func register(w http.ResponseWriter, r *http.Request) {
 
         // check if username is available
         _, ok = db[username]
-        if ok {
+		
+		if ok {
             // username taken
             t, err := template.ParseFiles("register.html")
             if err != nil {
@@ -173,7 +176,9 @@ func register(w http.ResponseWriter, r *http.Request) {
 
             cookie := GenCookie(username)
 
-            newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []*User{}}
+            newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []string{}}
+			fmt.Println("JSON DATA:")
+			fmt.Println(string(db_user_to_JSON(newUser))[:])
             db[username] = &newUser
             // everything ok, redirect to login page
             http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -254,7 +259,7 @@ func home(w http.ResponseWriter, r *http.Request) {
 		
 		// check to see if followed users' accounts still exist
 		for i, followed := range db[username].Follows {
-			_, ok := db[followed.Username]
+			_, ok := db[followed]
 			if !ok {
 				// unfollow user if account doesn't exist
 				db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
@@ -266,6 +271,10 @@ func home(w http.ResponseWriter, r *http.Request) {
 			"posts": db[username].Posts,
 			"follows": db[username].Follows,
 		}
+		
+		fmt.Println("JSON DATA:")
+		fmt.Println(string(db_user_to_JSON(*db[username]))[:])
+		
 		t.Execute(w, varmap)
     }
 }
@@ -347,7 +356,7 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
 			followed := "Follow"
 			// check if you are following this user
 			for _, v := range db[home_username].Follows {
-				if v.Username == username {
+				if v == username {
 					followed = "Unfollow"
 					break
 				}
@@ -355,7 +364,7 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
 			
 			// check to see if followed users' accounts still exist
 			for i, followed := range db[username].Follows {
-				_, ok := db[followed.Username]
+				_, ok := db[followed]
 				if !ok {
 					// unfollow user if account doesn't exist
 					db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
@@ -394,7 +403,7 @@ func follow(w http.ResponseWriter, r *http.Request) {
 			following := false
 			for i, v := range db[home_username].Follows {
 				// Unfollow them
-				if v.Username == username {
+				if v == username {
 					following = true
 					db[home_username].Follows = append(db[home_username].Follows[:i], db[home_username].Follows[i+1:]...)
 					break
@@ -403,7 +412,7 @@ func follow(w http.ResponseWriter, r *http.Request) {
 			
 			if !following {
 				// Follow them
-				db[home_username].Follows = append(db[home_username].Follows, db[username])
+				db[home_username].Follows = append(db[home_username].Follows, db[username].Username)
 			}
 		}
         http.Redirect(w, r, path.Join("/user", username), http.StatusSeeOther)
@@ -439,6 +448,30 @@ func delete_account(w http.ResponseWriter, r *http.Request) {
 		
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
+}
+
+func db_check_user_exists(username string) bool{
+	if _, err := os.Stat(path.Join("db/users", username+".json")); !os.IsNotExist(err) {
+		return true
+	}
+	return false
+}
+
+// converting user struct to JSON string
+func db_user_to_JSON(user User) []byte {
+	JSON_string, _ := json.Marshal(user)
+	return JSON_string
+}
+
+// converting JSON string to user struct
+func db_JSON_to_user(user []byte) {
+	var dat map[string]interface{}
+	if err := json.Unmarshal(user, &dat); err != nil {
+        panic(err)
+    }
+	fmt.Println(dat)
+	
+	// return User{Username: dat["Username"], Hash: dat["Hash"], SessionID: dat["SessionID"], Created: dat["Created"], Posts: []*Post{}, Follows: []*User{}}
 }
 
 var db = map[string]*User{}
