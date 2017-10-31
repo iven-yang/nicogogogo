@@ -41,14 +41,16 @@ func handleConnection(conn net.Conn) {
             fmt.Println("Handling logout action")
         case common.REGISTER:
 			fmt.Println("Handling register action")
-            // db_register(db_JSON_to_user())
+            // db_register(db_JSON_to_user(request.Data["username"]))
         case common.DELETE:
             fmt.Println("Handling delete action")
-			// db_delete_user()
+			// db_delete_user(request.Data["username"])
         case common.FOLLOW:
             fmt.Println("Handling follow action")
+			// db_update_user(request.Data["username"], request.SessionID, request.Data["follow"], "")
         case common.POST:
             fmt.Println("Handling post action")
+			// db_update_user(request.Data["username"], request.SessionID, "", request.Data["Post"])
         case common.FEED:
             fmt.Println("Handling feed action")
         case common.PROFILE:

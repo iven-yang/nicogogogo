@@ -21,7 +21,7 @@ const(
 type Request struct {
     SessionID string
     Action Action
-    Data map[string]string
+    Data map[string]interface{}
 }
 
 func (r Request) String() string {
