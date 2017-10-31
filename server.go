@@ -2,10 +2,10 @@ package main
 
 import (
     "fmt"
-	"encoding/json"
-	"os"
+    "encoding/json"
+    "os"
     "errors"
-	"io/ioutil"
+    "io/ioutil"
     "strings"
     "time"
     "html/template"
@@ -21,7 +21,7 @@ const USER_NX = "User does not exist."
 
 type Post struct {
     Content string
-	Timestr string
+    Timestr string
     Time time.Time
 }
 
