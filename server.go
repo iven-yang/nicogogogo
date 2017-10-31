@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "encoding/gob"
     "encoding/json"
     "os"
     "errors"
@@ -11,13 +12,22 @@ import (
     "html/template"
     "math/rand"
     "log"
+    "net"
     "net/http"
     "golang.org/x/crypto/bcrypt"
     "path"
+    "./common"
 )
 
+const PROTOCOL = "tcp"
+const BACKEND_ADDR = "localhost"
+const BACKEND_PORT = "1337"
+const BACKEND_LOC = BACKEND_ADDR + ":" + BACKEND_PORT
+
 const COOKIE_LENGTH = 25
+
 const USER_NX = "User does not exist."
+const BACKEND_ERR = "Error communicating with backend server"
 
 type Post struct {
     Content string
@@ -32,6 +42,29 @@ type User struct {
     Created time.Time
     Follows []string
     Posts []*Post
+}
+
+func QueryBackend(r common.Request) (common.Request, error){
+    fmt.Println("Querying backend")
+    fmt.Println(r)
+
+    conn, err := net.Dial(PROTOCOL, BACKEND_LOC)
+    if err != nil {
+        fmt.Println("Connection error")
+        return common.Request{}, errors.New(BACKEND_ERR)
+    }
+    defer conn.Close()
+    conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+
+    encoder := gob.NewEncoder(conn)
+    encoder.Encode(r)
+
+    request := common.Request{}
+    dec := gob.NewDecoder(conn)
+    dec.Decode(&request)
+    fmt.Println(request)
+    return request, nil
+ 
 }
 
 // landing page for people not logged in
@@ -53,6 +86,12 @@ func GenCookie(username string) http.Cookie {
     cookieValue := username + ":" + fmt.Sprintf("%X", randomValue)
     expire := time.Now().AddDate(0, 0, 1)
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
+}
+
+func MakeCookie(SessionID string) http.Cookie {
+    // generaate random 50 byte string to use as a session cookie
+    expire := time.Now().AddDate(0, 0, 1)
+    return http.Cookie{Name: "SessionID", Value: SessionID, Expires: expire, HttpOnly: true}
 }
 
 // Get the username of the user currently making the request
@@ -195,17 +234,37 @@ func register(w http.ResponseWriter, r *http.Request) {
 func login(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
-        if IsLoggedIn(r) {
+        cookie, err := r.Cookie("SessionID")
+        if err != nil {
+            t, errz := template.ParseFiles("login.html")
+            if errz != nil {
+                log.Fatal("login: ", err)
+            }
+            t.Execute(w, "")
+            return
+        }
+
+        fullSessionID := cookie.Value
+        query := common.Request{SessionID: fullSessionID,
+                               Action: common.LOGIN,
+                               Data: map[string]interface{}{}}
+        response, err := QueryBackend(query)
+        if response.Data["LoggedIn"] == true {
             fmt.Println("Continuing session")
             http.Redirect(w, r, "/home", http.StatusSeeOther)
-        } else {
-            fmt.Println("Cookie does not match")
-            t, err := template.ParseFiles("login.html")
-                if err != nil {
-                    log.Fatal("login: ", err)
-                }
-            t.Execute(w, "")
         }
+
+        // if IsLoggedIn(r) {
+        //     fmt.Println("Continuing session")
+        //     http.Redirect(w, r, "/home", http.StatusSeeOther)
+        // } else {
+        //     fmt.Println("Cookie does not match")
+        //     t, err := template.ParseFiles("login.html")
+        //         if err != nil {
+        //             log.Fatal("login: ", err)
+        //         }
+        //     t.Execute(w, "")
+        // }
     } else {
         // get user input
         r.ParseForm()
@@ -215,17 +274,25 @@ func login(w http.ResponseWriter, r *http.Request) {
         username := strings.ToLower(strings.Join(u, ""))
         password := strings.Join(p, "")
 
-        // authenticate username and password
-        user, ok := db[username]
-        var err error
-        if !ok {
-            err = errors.New(USER_NX)
-        } else {
-            hash := user.Hash
-            err = bcrypt.CompareHashAndPassword(hash, []byte(password))
-        }
+        query := common.Request{SessionID: "",
+                                Action: common.LOGIN,
+                                Data: map[string]interface{}{}}
+        query.Data["Username"] = username
+        query.Data["Password"] = password
 
+        response, err := QueryBackend(query)
         if err != nil {
+            fmt.Println(BACKEND_ERR)
+            t, err := template.ParseFiles("login.html")
+            if err != nil {
+                log.Fatal("login: ", err)
+            }
+            t.Execute(w, "Error: username or password incorrect")
+            return
+        }
+        // authenticate username and password
+
+        if response.Data["LoggedIn"] == false {
             // authentication failed
             t, err := template.ParseFiles("login.html")
             if err != nil {
@@ -234,8 +301,7 @@ func login(w http.ResponseWriter, r *http.Request) {
             t.Execute(w, "Error: username or password incorrect")
         } else {
             // create session
-            cookie := GenCookie(username)
-            db[username].SessionID = cookie.Value
+            cookie := MakeCookie(response.SessionID)
             http.SetCookie(w, &cookie)
             // everything ok, log them in
             fmt.Println("Login successful")
@@ -504,6 +570,9 @@ func db_JSON_to_user(username string) User {
 var db = map[string]*User{}
 
 func main() {
+    if _, err := os.Stat("db/users"); os.IsNotExist(err) {
+        os.MkdirAll("db/users", 0755)
+    }
     rand.Seed(time.Now().UTC().UnixNano())
 
     // test cookie generation ***REMOVE***

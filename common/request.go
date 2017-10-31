@@ -8,7 +8,8 @@ import(
 type Action int
 
 const(
-    LOGIN Action = iota
+    RESPONSE Action = iota
+    LOGIN
     LOGOUT
     REGISTER
     DELETE
