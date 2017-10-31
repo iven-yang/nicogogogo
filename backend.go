@@ -58,8 +58,23 @@ func handleConnection(conn net.Conn) {
     }
 }
 
-func db_update_user(username string, sessionid string, follows []string, post Post){
+func db_update_user(username string, sessionid string, follow_username string, post Post){
+	user = db_JSON_to_user(username)
+	if sessionid != "" {
+		user.SessionID = sessionid
+	}
+	if follow_username != "" {
+		user.Follows = append(user.Follows, follow_username)
+	}
+	if post.Content != "" {
+		user.Posts = append(user.Posts, &post)
+	}
 	
+	updated_user := db_user_to_JSON(user)
+	writeerr := ioutil.WriteFile(path.Join("db/users", username+".json"), updated_user, 0644)
+	if writeerr != nil {
+		panic(writeerr)
+	}
 }
 
 func db_register(user User) {
