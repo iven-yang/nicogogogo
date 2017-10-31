@@ -60,7 +60,7 @@ func handleConnection(conn net.Conn) {
 
 // update user JSON file
 func db_update_user(username string, sessionid string, follow_username string, post Post){
-	user = db_JSON_to_user(username)
+	user := db_JSON_to_user(username)
 	if sessionid != "" {
 		user.SessionID = sessionid
 	}
