@@ -58,6 +58,7 @@ func handleConnection(conn net.Conn) {
     }
 }
 
+// update user JSON file
 func db_update_user(username string, sessionid string, follow_username string, post Post){
 	user = db_JSON_to_user(username)
 	if sessionid != "" {
@@ -77,6 +78,7 @@ func db_update_user(username string, sessionid string, follow_username string, p
 	}
 }
 
+// make a JSON file for new user
 func db_register(user User) {
 	fmt.Println("JSON DATA:")
 	newUserBytes := db_user_to_JSON(user)
@@ -87,6 +89,7 @@ func db_register(user User) {
 	}
 }
 
+// remove JSON file for a user
 func db_delete_user(username string) {
 	err := os.Remove(path.Join("db/users", username+".json"))
 		if err != nil {
@@ -96,6 +99,7 @@ func db_delete_user(username string) {
 	fmt.Println("User Removed: ", username)
 }
 
+// check if a JSON file for a user exists
 func db_check_user_exists(username string) bool {
 	if _, err := os.Stat(path.Join("db/users", username+".json")); !os.IsNotExist(err) {
 		return true
