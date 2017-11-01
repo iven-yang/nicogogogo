@@ -440,7 +440,7 @@ func browse(w http.ResponseWriter, r *http.Request) {
         }
         
         varmap := map[string]interface{}{
-    "users": other_users,
+			"users": other_users,
         }
         t.Execute(w, varmap)
     }
