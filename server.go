@@ -435,7 +435,7 @@ func browse(w http.ResponseWriter, r *http.Request) {
         other_users := make([]string, len(db)-1)
         for usr := range db {
             if usr != username {
-                other_users = append(other_users, *db[usr].Username)
+                other_users = append(other_users, db[usr].Username)
             }
         }
         
@@ -448,65 +448,81 @@ func browse(w http.ResponseWriter, r *http.Request) {
 
 // look at a user's profile (must be logged in)
 func user_profiles(w http.ResponseWriter, r *http.Request) {
-	if !IsLoggedIn(r) {
-		// Make user log in
+	cookie, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-		// return HTML page with user's info
-		if (r.URL.Path == "/user" || r.URL.Path == "user") || (path.Dir(r.URL.Path) != "/user" && path.Dir(r.URL.Path) != "user") {
-			// path is faulty
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
-		}
-		// username of current profile you are looking at
-		username := path.Base(r.URL.Path)
-		
-		// check if user exists
-		if _, ok := db[username]; ok {
-			// User found
-			t, err := template.ParseFiles("profiles.html")
-			if err != nil {
-				log.Fatal("profiles: ", err)
-			}
-			
-			// currently logged in user's username
-			home_username := getUsername(r)
-			
-			followed := "Follow"
-			// check if you are following this user
-			for _, v := range db[home_username].Follows {
-				if v == username {
-					followed = "Unfollow"
-					break
-				}
-			}
-			
-			// check to see if followed users' accounts still exist
-			for i, followed := range db[username].Follows {
-				_, ok := db[followed]
-				if !ok {
-					// unfollow user if account doesn't exist
-					db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
-				}
-			}
-			
-			varmap := map[string]interface{}{
-				"user": username,
-				"posts": db[username].Posts,
-				"follows": db[username].Follows,
-				"followed": followed,
-			}
-			t.Execute(w, varmap)
-		} else {
-			// User not found
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
-		}
+        return
     }
+
+    fullSessionID := cookie.Value
+
+	// return HTML page with user's info
+	if (r.URL.Path == "/user" || r.URL.Path == "user") || (path.Dir(r.URL.Path) != "/user" && path.Dir(r.URL.Path) != "user") {
+		// path is faulty
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
+	}
+	
+	// username of current profile you are looking at
+	username_path := path.Base(r.URL.Path)
+	
+	query := common.Request{SessionID: fullSessionID,
+                           Action: common.PROFILE,
+                           Data: map[string]interface{}{"Method": r.Method, "Profile_user": username_path}}
+    response, _ := QueryBackend(query)
+
+    if !response.Data["LoggedIn"].(bool) { // only view profiles if you are logged in
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+        return
+    } else if response.Data["Username"].(string) == "" { // if requested user exists
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
+		return
+	}
+	
+	following := response.Data["Following"].(string)
+	username := response.Data["Username"].(string)
+    posts := response.Data["Posts"].([]Post)
+    follows := response.Data["Follows"].([]string)
+
+    if posts == nil {
+        posts = make([]Post, 0)
+    }
+
+    if follows == nil {
+        follows = make([]string, 0)
+    }
+	
+	t, err := template.ParseFiles("profiles.html")
+	if err != nil {
+		log.Fatal("profiles: ", err)
+	}
+	
+	varmap := map[string]interface{}{
+		"user": username,
+		"posts": posts,
+		"follows": follows,
+		"following": following,
+	}
+	t.Execute(w, varmap)
 }
 
 // User follows someone else (must be logged in)
 func follow(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
+    _, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
+        return
     } else {
         // username of user who is logged in
         home_username := getUsername(r)

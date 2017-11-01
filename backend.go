@@ -239,11 +239,17 @@ func homeHandler(r common.Request) common.Request {
                                                        "Follows": follows,
                                                       }, 
                          }
-
 }
 
 func followHandler(r common.Request) {
-    return
+    // user, err := AuthenticateFetch(r.SessionID)
+    // if err != nil {
+        // return common.Request{
+                              // SessionID: "",
+                              // Action: common.RESPONSE,
+                              // Data: map[string]interface{}{"LoggedIn": false},
+                             // }
+    // }
 }
 
 func postHandler(r common.Request) common.Request {
@@ -275,8 +281,82 @@ func feedHandler(r common.Request) {
     return
 }
 
-func profileHandler(r common.Request) {
-    return
+func profileHandler(r common.Request) common.Request {
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": false},
+                             }
+    }
+	
+	profile_username := r.Data["Profile_user"].(string)
+	
+	// Check if the requested user actually exists
+	if !db_check_user_exists(profile_username) {
+		return common.Request{
+							  SessionID: user.SessionID,
+							  Action: common.RESPONSE,
+							  Data: map[string]interface{}{
+														   "LoggedIn": true,
+														   "Username": "",
+														  }, 
+							 }
+	}
+	
+	// check to see if followed users' accounts still exist
+	db_unfollow_deleted_users(profile_username)
+	
+	profile_user := db_JSON_to_user(profile_username)
+	
+    posts := make([]Post, 0)
+    for x := range profile_user.Posts {
+        posts = append(posts, *user.Posts[x])
+    }
+    follows := profile_user.Follows
+    gob.Register(posts)
+    gob.Register(follows)
+	
+	// Check to see if you are following this user (for the button to display follow or unfollow)
+	following := "Follow"
+	for _, v := range user.Follows {
+		if v == profile_username {
+			following = "Unfollow"
+			break
+		}
+	}
+	
+    return common.Request{
+                          SessionID: user.SessionID,
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{
+                                                       "LoggedIn": true,
+                                                       "Following": following,
+													   "Username": profile_username,
+                                                       "Posts": posts,
+                                                       "Follows": follows,
+                                                      }, 
+                         }
+}
+
+func db_unfollow_deleted_users(username string) {
+	user := db_JSON_to_user(username)
+	follows := user.Follows
+	
+	offset := 0
+	for i, followed := range follows {
+		if !db_check_user_exists(followed) {
+			// unfollow user if account doesn't exist
+			user.Follows = append(user.Follows[:i-offset], user.Follows[i+1-offset:]...)
+			offset = offset + 1
+		}
+	}
+	updated_user := db_user_to_JSON(user)
+	writeerr := ioutil.WriteFile(path.Join("db/users", strings.ToLower(username)+".json"), updated_user, 0644)
+	if writeerr != nil {
+		panic(writeerr)
+	}
 }
 
 // update user JSON file
@@ -374,6 +454,7 @@ func handleConnection(conn net.Conn) {
             response = homeHandler(request)
         case common.FOLLOW:
             fmt.Println("Handling follow action")
+			//response = followHandler(request)
         case common.POST:
             fmt.Println("Handling post action")
             response = postHandler(request)
@@ -381,6 +462,7 @@ func handleConnection(conn net.Conn) {
             fmt.Println("Handling feed action")
         case common.PROFILE:
             fmt.Println("Handling profile action")
+			response = profileHandler(request)
         default:
             fmt.Println("Unrecognized action")
             response = common.Request{}
