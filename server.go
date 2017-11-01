@@ -607,9 +607,7 @@ func main() {
     follows := make([]string, 0)
     gob.Register(posts)
     gob.Register(follows)
-    if _, err := os.Stat("db/users"); os.IsNotExist(err) {
-        os.MkdirAll("db/users", 0755)
-    }
+	
     rand.Seed(time.Now().UTC().UnixNano())
 
     // test cookie generation ***REMOVE***
