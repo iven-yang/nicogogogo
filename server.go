@@ -432,10 +432,10 @@ func browse(w http.ResponseWriter, r *http.Request) {
         
         username := getUsername(r)
         
-        other_users := make([]User, len(db)-1)
+        other_users := make([]string, len(db)-1)
         for usr := range db {
             if usr != username {
-                other_users = append(other_users, *db[usr])
+                other_users = append(other_users, *db[usr].Username)
             }
         }
         
