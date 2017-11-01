@@ -203,7 +203,7 @@ func deleteHandler(r common.Request) common.Request {
                              }
     }
 	db_delete_user(user.Username)
-	fmt.Println(user.Username " has deleted their account")
+	fmt.Println(user.Username, " has deleted their account")
     return common.Request{
                           SessionID: "",
                           Action: common.RESPONSE,
