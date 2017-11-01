@@ -246,8 +246,29 @@ func followHandler(r common.Request) {
     return
 }
 
-func postHandler(r common.Request) {
-    return
+func postHandler(r common.Request) common.Request {
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": false},
+                             }
+    }
+    new_post := Post{
+                     Content: r.Data["Status"].(string), 
+                     Time: time.Now(),
+                     Timestr: time.Now().Format("Jan 2 2006: 3:04 pm"),
+                    }
+    db_update_user(user.Username, "", "", new_post)
+    return common.Request{
+                          SessionID: user.SessionID,
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{
+                                                       "LoggedIn": true,
+                                                       "Success": true,
+                                                      },
+                         }
 }
 
 func feedHandler(r common.Request) {
@@ -353,10 +374,9 @@ func handleConnection(conn net.Conn) {
             response = homeHandler(request)
         case common.FOLLOW:
             fmt.Println("Handling follow action")
-			// db_update_user(request.Data["username"], request.SessionID, request.Data["follow"], "")
         case common.POST:
             fmt.Println("Handling post action")
-			// db_update_user(request.Data["username"], request.SessionID, "", request.Data["Post"])
+            response = postHandler(request)
         case common.FEED:
             fmt.Println("Handling feed action")
         case common.PROFILE:
