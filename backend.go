@@ -46,26 +46,6 @@ func GenCookie(username string) http.Cookie {
     return http.Cookie{Name: "SessionID", Value: cookieValue, Expires: expire, HttpOnly: true}
 }
 
-// Get the username of the user currently making the request
-// func getUsername(SessionID string) string {
-//     if IsLoggedIn(SessionID){
-//         // Split the sessionID to Username and ID (username+random)        
-//         if len(SessionID) >= len(SessionID) - (COOKIE_LENGTH * 2 + 1) {
-//             return SessionID[:len(SessionID) - (COOKIE_LENGTH * 2 + 1)]
-//         }
-//     }
-//     return ""
-// }
-
-// func GetSessionID(username string) (string, error) {
-//     if !db_check_user_exists(username) {
-//         return "", errors.New(USER_NX)
-//     }
-// 
-//     user := db_JSON_to_user(username)
-//     return user.SessionID, nil
-// }
-
 // Is the user logged in
 func AuthenticateFetch(fullSessionID string) (User, error) {
     // Check if cookie is larger than the minimum cookie length
@@ -87,7 +67,7 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
 
     // Check if the stored session id and the bearer session id match
     // fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
-    if fullSessionID == savedSessionID {
+    if len(savedSessionID) > (COOKIE_LENGTH * 2 + 1) && fullSessionID == savedSessionID {
         return user, nil
     }
     return User{}, errors.New(SESSIONID_MISMATCH)

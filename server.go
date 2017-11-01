@@ -192,18 +192,6 @@ func register(w http.ResponseWriter, r *http.Request) {
             t.Execute(w, "")
             return
         }
-
-        // if IsLoggedIn(r) {
-        //     fmt.Println("Continuing session")
-        //     http.Redirect(w, r, "/home", http.StatusSeeOther)
-        // } else {
-        //     t, err := template.ParseFiles("register.html")
-        //         if err != nil {
-        //             log.Fatal("login: ", err)
-        //         }
-        //     t.Execute(w, "")
-        // }
-        // return
     } else {
         fmt.Println("Handling POST request to login")
         // get user input
@@ -262,33 +250,6 @@ func register(w http.ResponseWriter, r *http.Request) {
 
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     }
-
-        // check if username is available
-        // if db_check_user_exists(username) {
-        //     // username taken
-        //     t, err := template.ParseFiles("register.html")
-        //     if err != nil {
-        //         log.Fatal("registration: ", err)
-        //     }
-        //     t.Execute(w, "Error: username not available")
-        // } else {
-        //     // create new user object/db entry
-        //     hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-
-        //     if err != nil {
-        //         log.Fatal("registration: ", err)
-        //     }
-
-        //     cookie := GenCookie(username)
-
-        //     newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []string{}}
-	// 		
-        //     // make JSON file for user
-        //     db_register(newUser)
-        //     
-        //     db[username] = &newUser
-        //     // everything ok, redirect to login page
-        //     http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -324,18 +285,6 @@ func login(w http.ResponseWriter, r *http.Request) {
             t.Execute(w, "")
             return
         }
-
-        // if IsLoggedIn(r) {
-        //     fmt.Println("Continuing session")
-        //     http.Redirect(w, r, "/home", http.StatusSeeOther)
-        // } else {
-        //     fmt.Println("Cookie does not match")
-        //     t, err := template.ParseFiles("login.html")
-        //         if err != nil {
-        //             log.Fatal("login: ", err)
-        //         }
-        //     t.Execute(w, "")
-        // }
     } else {
         // get user input
         r.ParseForm()
@@ -412,6 +361,14 @@ func home(w http.ResponseWriter, r *http.Request) {
     posts := response.Data["Posts"].([]Post)
     follows := response.Data["Follows"].([]string)
 
+    if posts == nil {
+        posts = make([]Post, 0)
+    }
+
+    if follows == nil {
+        follows = make([]string, 0)
+    }
+
     varmap := map[string]interface{}{
                                      "user": "Welcome " + username,
                                      "posts": posts,
@@ -423,43 +380,8 @@ func home(w http.ResponseWriter, r *http.Request) {
             log.Fatal("home: ", err)
     }
     t.Execute(w, varmap)
-    return
 }
-//     if !IsLoggedIn(r) {
-//         // Make user log in
-//         http.Redirect(w, r, "/login", http.StatusSeeOther)
-//     } else {
-// 		// return HTML page to user
-// 		t, err := template.ParseFiles("home.html")
-// 		if err != nil {
-// 			log.Fatal("home: ", err)
-// 		}
-// 		
-// 		username := getUsername(r)
-// 		
-// 		fmt.Println(db_user_to_JSON(db_JSON_to_user(username)))
-// 		
-// 		// check to see if followed users' accounts still exist
-// 		for i, followed := range db[username].Follows {
-// 			_, ok := db[followed]
-// 			if !ok {
-// 				// unfollow user if account doesn't exist
-// 				db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
-// 			}
-// 		}
-// 		
-// 		varmap := map[string]interface{}{
-//             "user": "Welcome " + username,
-// 			"posts": db[username].Posts,
-// 			"follows": db[username].Follows,
-// 		}
-// 		
-// 		fmt.Println("JSON DATA:")
-// 		fmt.Println(string(db_user_to_JSON(*db[username]))[:])
-// 		
-// 		t.Execute(w, varmap)
 
-// User makes a status post (must be logged in)
 func post(w http.ResponseWriter, r *http.Request) {
     if !IsLoggedIn(r) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
