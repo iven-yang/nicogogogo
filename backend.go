@@ -116,8 +116,21 @@ func loginHandler(r common.Request) common.Request {
     }
 }
 
-func logoutHandler(r common.Request) {
-    return
+func logoutHandler(r common.Request) common.Request {
+	user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"Success": false},
+                             }
+    }
+	db_update_user(user.Username, "", "", Post{})
+    return common.Request{
+                          SessionID: "",
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{},
+                         }
 }
 
 func registerHandler(r common.Request) common.Request {
@@ -180,8 +193,22 @@ func registerHandler(r common.Request) common.Request {
     }
 }
 
-func deleteHandler(r common.Request) {
-    return
+func deleteHandler(r common.Request) common.Request {
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"Success": false},
+                             }
+    }
+	db_delete_user(user.Username)
+	fmt.Println(user.Username " has deleted their account")
+    return common.Request{
+                          SessionID: "",
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{},
+                         }
 }
 
 func homeHandler(r common.Request) common.Request {
@@ -314,13 +341,13 @@ func handleConnection(conn net.Conn) {
             response = loginHandler(request)
         case common.LOGOUT:
             fmt.Println("Handling logout action")
+			response = logoutHandler(request)
         case common.REGISTER:
             fmt.Println("Handling register action")
             response = registerHandler(request)
-            // db_register(db_JSON_to_user())
         case common.DELETE:
             fmt.Println("Handling delete action")
-            // db_delete_user()
+            response = deleteHandler(request)
         case common.HOME:
             fmt.Println("Handling home action")
             response = homeHandler(request)

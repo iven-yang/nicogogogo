@@ -522,36 +522,57 @@ func follow(w http.ResponseWriter, r *http.Request) {
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
-		// Make user log in
-        http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-        // logout stuff
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
         expire := time.Unix(0, 0)
-        cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
-        http.SetCookie(w, &cookie)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/", http.StatusSeeOther)
+        return
     }
+
+    fullSessionID := cookie.Value
+    query := common.Request{SessionID: fullSessionID,
+                           Action: common.LOGOUT,
+                           Data: map[string]interface{}{}}
+    response, _ := QueryBackend(query)
+	
+	if response.Data["Success"] == false {
+		fmt.Println("Problem during logout")
+	}
+	
+	expire := time.Unix(0, 0)
+	newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+	http.SetCookie(w, &newcookie)
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func delete_account(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
-		// Make user log in
-        http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-		// logout stuff
-		username := getUsername(r)
-		
-		expire := time.Unix(0, 0)
-		cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
-		http.SetCookie(w, &cookie)
-		
-		delete(db, username)
-		// remove user's JSON file
-		db_delete_user(username)
-		
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
+        http.Redirect(w, r, "/", http.StatusSeeOther)
+        return
+    }
+
+    fullSessionID := cookie.Value
+    query := common.Request{SessionID: fullSessionID,
+                           Action: common.DELETE,
+                           Data: map[string]interface{}{}}
+    response, _ := QueryBackend(query)
+	
+	if response.Data["Success"] == false {
+		fmt.Println("Problem during deletion")
 	}
+	
+	expire := time.Unix(0, 0)
+	newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+	http.SetCookie(w, &newcookie)
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func db_register(user User) {
