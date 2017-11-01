@@ -1,6 +1,7 @@
 package main
 
 import(
+    "log"
     "encoding/json"
     "io/ioutil"
     "time"
@@ -277,8 +278,32 @@ func postHandler(r common.Request) common.Request {
                          }
 }
 
-func feedHandler(r common.Request) {
-    return
+func browseHandler(r common.Request) common.Request{
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": false},
+                             }
+    }
+
+    username := strings.ToLower(user.Username)
+    users := db_get_users()
+    other_users := make([]string, len(users)-1)
+    for i := range users {
+	if users[i] != username {
+	    other_users = append(other_users, users[i])
+	}
+    }
+
+    gob.Register(other_users)
+    return common.Request{
+                          SessionID: r.SessionID,
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{"LoggedIn": true,
+                                                       "Users": other_users},
+                         }
 }
 
 func profileHandler(r common.Request) common.Request {
@@ -390,6 +415,19 @@ func db_register(user User) {
     }
 }
 
+func db_get_users() []string {
+    users := make([]string, 0)
+    files, err := ioutil.ReadDir("./db/users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, f := range files {
+        users = append(users, f.Name()[:len(f.Name()) - 5])
+    }
+    return users
+}
+
 // remove JSON file for a user
 func db_delete_user(username string) {
     err := os.Remove(path.Join("db/users", strings.ToLower(username)+".json"))
@@ -458,8 +496,9 @@ func handleConnection(conn net.Conn) {
         case common.POST:
             fmt.Println("Handling post action")
             response = postHandler(request)
-        case common.FEED:
-            fmt.Println("Handling feed action")
+        case common.BROWSE:
+            fmt.Println("Handling browse action")
+            response = browseHandler(request)
         case common.PROFILE:
             fmt.Println("Handling profile action")
 			response = profileHandler(request)
@@ -496,5 +535,5 @@ func main() {
     if _, err := os.Stat("db/users"); os.IsNotExist(err) {
         os.MkdirAll("db/users", 0755)
     }
-	mainLoop()
+    mainLoop()
 }
