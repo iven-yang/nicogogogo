@@ -384,5 +384,8 @@ func mainLoop() {
 
 func main() {
     fmt.Println("Hello world!")
-    mainLoop()
+    if _, err := os.Stat("db/users"); os.IsNotExist(err) {
+        os.MkdirAll("db/users", 0755)
+    }
+	mainLoop()
 }
