@@ -420,30 +420,47 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 // look through other users (must be logged in)
 func browse(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
-		// Make user log in
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-        // return HTML page to user
-        t, err := template.ParseFiles("browse.html")
-        if err != nil {
-            log.Fatal("browse: ", err)
-        }
-        
-        username := getUsername(r)
-        
-        other_users := make([]string, len(db)-1)
-        for usr := range db {
-            if usr != username {
-                other_users = append(other_users, *db[usr].Username)
-            }
-        }
-        
-        varmap := map[string]interface{}{
-			"users": other_users,
-        }
-        t.Execute(w, varmap)
+        return
     }
+    
+    fullSessionID := cookie.Value
+
+    query := common.Request{
+                            SessionID: fullSessionID,
+                            Action: common.BROWSE,
+                            Data: map[string]interface{}{},
+                           }
+    response, err := QueryBackend(query)
+    if err != nil {
+        fmt.Println(BACKEND_ERR)
+        http.Redirect(w, r, "/home", http.StatusSeeOther)
+        return
+    }
+
+    if !response.Data["LoggedIn"].(bool) {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+        return
+    }
+
+    t, err := template.ParseFiles("browse.html")
+    if err != nil {
+        log.Fatal("browse: ", err)
+    }
+    varmap := map[string]interface{}{
+                                     "users": response.Data["Users"].([]string),
+                                    }
+    t.Execute(w, varmap)
 }
 
 // look at a user's profile (must be logged in)

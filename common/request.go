@@ -16,7 +16,7 @@ const(
     HOME
     FOLLOW
     POST
-    FEED
+    BROWSE
     PROFILE
 )
 
