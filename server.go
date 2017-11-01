@@ -14,7 +14,6 @@ import (
     "log"
     "net"
     "net/http"
-    "golang.org/x/crypto/bcrypt"
     "path"
     "./common"
 )
@@ -156,17 +155,57 @@ func IsLoggedIn(r *http.Request) bool {
 func register(w http.ResponseWriter, r *http.Request) {
     // return HTML page to user
     if r.Method == "GET" {
-        if IsLoggedIn(r) {
-            fmt.Println("Continuing session")
-            http.Redirect(w, r, "/home", http.StatusSeeOther)
-        } else {
+        cookie, err := r.Cookie("SessionID")
+        if err != nil {
+            t, errz := template.ParseFiles("register.html")
+            if errz != nil {
+                log.Fatal("login: ", err)
+            }
+            t.Execute(w, "")
+            return
+        }
+
+        fullSessionID := cookie.Value
+        if fullSessionID == "" {
             t, err := template.ParseFiles("register.html")
                 if err != nil {
                     log.Fatal("login: ", err)
                 }
             t.Execute(w, "")
+            return
         }
+
+        query := common.Request{SessionID: fullSessionID,
+                               Action: common.REGISTER,
+                               Data: map[string]interface{}{"Method": r.Method}}
+        response, err := QueryBackend(query)
+        if response.Data["LoggedIn"] == true {
+            fmt.Println("Continuing session")
+            http.Redirect(w, r, "/home", http.StatusSeeOther)
+            return
+        } else {
+            fmt.Println("Cookie does not match")
+            t, err := template.ParseFiles("register.html")
+                if err != nil {
+                    log.Fatal("login: ", err)
+                }
+            t.Execute(w, "")
+            return
+        }
+
+        // if IsLoggedIn(r) {
+        //     fmt.Println("Continuing session")
+        //     http.Redirect(w, r, "/home", http.StatusSeeOther)
+        // } else {
+        //     t, err := template.ParseFiles("register.html")
+        //         if err != nil {
+        //             log.Fatal("login: ", err)
+        //         }
+        //     t.Execute(w, "")
+        // }
+        // return
     } else {
+        fmt.Println("Handling POST request to login")
         // get user input
         r.ParseForm()
 
@@ -181,6 +220,7 @@ func register(w http.ResponseWriter, r *http.Request) {
                 log.Fatal("registration: ", err)
             }
             t.Execute(w, "Error: please provide a username")
+            return
         }
 
         p, ok := r.Form["Password"]
@@ -192,43 +232,63 @@ func register(w http.ResponseWriter, r *http.Request) {
                 log.Fatal("registration: ", err)
             }
             t.Execute(w, "Error: please provide a password")
+            return
         }
 
         fmt.Println("New User: username = ", username, ", password = ", password)
-
-        // check if username is available
-		if db_check_user_exists(username) {
-            // username taken
+        query := common.Request{SessionID: "",
+                               Action: common.REGISTER,
+                               Data: map[string]interface{}{"Username": username,
+                                                            "Password": password,
+                                                            "Method": r.Method}}
+        response, err := QueryBackend(query)
+        if err != nil {
+            fmt.Println(BACKEND_LOC)
             t, err := template.ParseFiles("register.html")
             if err != nil {
                 log.Fatal("registration: ", err)
             }
-            t.Execute(w, "Error: username not available")
-        } else {
-            // create new user object/db entry
-            hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-
+            t.Execute(w, "")
+            return
+        }
+        if !response.Data["Success"].(bool) {
+            t, err := template.ParseFiles("register.html")
             if err != nil {
                 log.Fatal("registration: ", err)
             }
-
-            cookie := GenCookie(username)
-
-            newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []string{}}
-			
-			// make JSON file for user
-			db_register(newUser)
-			
-			db[username] = &newUser
-            // everything ok, redirect to login page
-            http.Redirect(w, r, "/login", http.StatusSeeOther)
+            t.Execute(w, response.Data["Error"].(string))
+            return
         }
+
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
     }
-    fmt.Println("Printing contents of database")
-    for key, value := range db {
-        fmt.Println("Key: ", key, "Value: ", value)
-        fmt.Println("Username: ", value.Username, "Hash: ", value.Hash, "Created: ", value.Created, "Posts: ", value.Posts, "Following: ", value.Follows)
-    }
+
+        // check if username is available
+        // if db_check_user_exists(username) {
+        //     // username taken
+        //     t, err := template.ParseFiles("register.html")
+        //     if err != nil {
+        //         log.Fatal("registration: ", err)
+        //     }
+        //     t.Execute(w, "Error: username not available")
+        // } else {
+        //     // create new user object/db entry
+        //     hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+
+        //     if err != nil {
+        //         log.Fatal("registration: ", err)
+        //     }
+
+        //     cookie := GenCookie(username)
+
+        //     newUser := User{Username: display, Hash: hash, SessionID: cookie.Value,Created: time.Now(), Posts: []*Post{}, Follows: []string{}}
+	// 		
+        //     // make JSON file for user
+        //     db_register(newUser)
+        //     
+        //     db[username] = &newUser
+        //     // everything ok, redirect to login page
+        //     http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -247,11 +307,22 @@ func login(w http.ResponseWriter, r *http.Request) {
         fullSessionID := cookie.Value
         query := common.Request{SessionID: fullSessionID,
                                Action: common.LOGIN,
-                               Data: map[string]interface{}{}}
+                               Data: map[string]interface{}{"Method": r.Method}}
         response, err := QueryBackend(query)
         if response.Data["LoggedIn"] == true {
             fmt.Println("Continuing session")
             http.Redirect(w, r, "/home", http.StatusSeeOther)
+        } else {
+            expire := time.Unix(0, 0)
+            cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+            http.SetCookie(w, &cookie)
+            fmt.Println("Cookie does not match")
+            t, err := template.ParseFiles("login.html")
+                if err != nil {
+                    log.Fatal("login: ", err)
+                }
+            t.Execute(w, "")
+            return
         }
 
         // if IsLoggedIn(r) {
@@ -276,7 +347,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 
         query := common.Request{SessionID: "",
                                 Action: common.LOGIN,
-                                Data: map[string]interface{}{}}
+                                Data: map[string]interface{}{"Method": r.Method}}
         query.Data["Username"] = username
         query.Data["Password"] = password
 
@@ -312,41 +383,81 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 // home page for users (must be logged in)
 func home(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
-		// Make user log in
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-		// return HTML page to user
-		t, err := template.ParseFiles("home.html")
-		if err != nil {
-			log.Fatal("home: ", err)
-		}
-		
-		username := getUsername(r)
-		
-		fmt.Println(db_user_to_JSON(db_JSON_to_user(username)))
-		
-		// check to see if followed users' accounts still exist
-		for i, followed := range db[username].Follows {
-			_, ok := db[followed]
-			if !ok {
-				// unfollow user if account doesn't exist
-				db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
-			}
-		}
-		
-		varmap := map[string]interface{}{
-            "user": "Welcome " + username,
-			"posts": db[username].Posts,
-			"follows": db[username].Follows,
-		}
-		
-		fmt.Println("JSON DATA:")
-		fmt.Println(string(db_user_to_JSON(*db[username]))[:])
-		
-		t.Execute(w, varmap)
+        return
     }
+
+    fullSessionID := cookie.Value
+    query := common.Request{SessionID: fullSessionID,
+                           Action: common.HOME,
+                           Data: map[string]interface{}{"Method": r.Method}}
+    response, err := QueryBackend(query)
+
+    if !response.Data["LoggedIn"].(bool) {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+        return
+    }
+
+    username := response.Data["Username"].(string)
+    posts := response.Data["Posts"].([]Post)
+    follows := response.Data["Follows"].([]string)
+
+    varmap := map[string]interface{}{
+                                     "user": "Welcome " + username,
+                                     "posts": posts,
+                                     "follows": follows,
+                                    }
+
+    t, err := template.ParseFiles("home.html")
+    if err != nil {
+            log.Fatal("home: ", err)
+    }
+    t.Execute(w, varmap)
+    return
 }
+//     if !IsLoggedIn(r) {
+//         // Make user log in
+//         http.Redirect(w, r, "/login", http.StatusSeeOther)
+//     } else {
+// 		// return HTML page to user
+// 		t, err := template.ParseFiles("home.html")
+// 		if err != nil {
+// 			log.Fatal("home: ", err)
+// 		}
+// 		
+// 		username := getUsername(r)
+// 		
+// 		fmt.Println(db_user_to_JSON(db_JSON_to_user(username)))
+// 		
+// 		// check to see if followed users' accounts still exist
+// 		for i, followed := range db[username].Follows {
+// 			_, ok := db[followed]
+// 			if !ok {
+// 				// unfollow user if account doesn't exist
+// 				db[username].Follows = append(db[username].Follows[:i], db[username].Follows[i+1:]...)
+// 			}
+// 		}
+// 		
+// 		varmap := map[string]interface{}{
+//             "user": "Welcome " + username,
+// 			"posts": db[username].Posts,
+// 			"follows": db[username].Follows,
+// 		}
+// 		
+// 		fmt.Println("JSON DATA:")
+// 		fmt.Println(string(db_user_to_JSON(*db[username]))[:])
+// 		
+// 		t.Execute(w, varmap)
 
 // User makes a status post (must be logged in)
 func post(w http.ResponseWriter, r *http.Request) {
@@ -494,7 +605,7 @@ func logout(w http.ResponseWriter, r *http.Request) {
         http.Redirect(w, r, "/login", http.StatusSeeOther)
     } else {
         // logout stuff
-        expire := time.Now().AddDate(0, 0, 1)
+        expire := time.Unix(0, 0)
         cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
         http.SetCookie(w, &cookie)
         http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -509,7 +620,7 @@ func delete_account(w http.ResponseWriter, r *http.Request) {
 		// logout stuff
 		username := getUsername(r)
 		
-		expire := time.Now().AddDate(0, 0, 1)
+		expire := time.Unix(0, 0)
 		cookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
 		http.SetCookie(w, &cookie)
 		
@@ -570,6 +681,10 @@ func db_JSON_to_user(username string) User {
 var db = map[string]*User{}
 
 func main() {
+    posts := make([]Post, 0)
+    follows := make([]string, 0)
+    gob.Register(posts)
+    gob.Register(follows)
     if _, err := os.Stat("db/users"); os.IsNotExist(err) {
         os.MkdirAll("db/users", 0755)
     }

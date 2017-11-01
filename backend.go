@@ -94,7 +94,7 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
 }
 
 func loginHandler(r common.Request) common.Request {
-    if r.SessionID != "" {
+    if r.Data["Method"].(string) == "GET" {
         _, err := AuthenticateFetch(r.SessionID)
         if err != nil {
             return common.Request{
@@ -109,6 +109,13 @@ func loginHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": true}, 
                              }
     } else {
+        if !db_check_user_exists(r.Data["Username"].(string)) {
+            return common.Request{
+                                  SessionID: "",
+                                  Action: common.RESPONSE,
+                                  Data: map[string]interface{}{"LoggedIn": false},
+                                 }
+        }
         user := db_JSON_to_user(r.Data["Username"].(string))
         err := bcrypt.CompareHashAndPassword(user.Hash, []byte(r.Data["Password"].(string)))
         if err != nil {
@@ -133,12 +140,99 @@ func logoutHandler(r common.Request) {
     return
 }
 
-func registerHandler(r common.Request) {
-    return
+func registerHandler(r common.Request) common.Request {
+    if r.Data["Method"].(string) == "GET" {
+        _, err := AuthenticateFetch(r.SessionID)
+        if err != nil {
+            return common.Request{
+                                  SessionID: "",
+                                  Action: common.RESPONSE,
+                                  Data: map[string]interface{}{"LoggedIn": false},
+                                 }
+        }
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": true}, 
+                             }
+
+    } else {
+        username := r.Data["Username"].(string)
+        password := r.Data["Password"].(string)
+
+        if db_check_user_exists(username) {
+            return common.Request{
+                                  SessionID: "",
+                                  Action: common.RESPONSE,
+                                  Data: map[string]interface{}{"Success": false, 
+                                                               "Error": "username not available"}, 
+                                 }
+        }
+
+        hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+
+        if err != nil {
+            return common.Request{
+                                  SessionID: "",
+                                  Action: common.RESPONSE,
+                                  Data: map[string]interface{}{"Success": false, 
+                                                               "Error": "could not create account"},
+                                 }
+        }
+
+        cookie := GenCookie(username)
+
+        newUser := User{
+                        Username: username,
+                        Hash: hash,
+                        SessionID: cookie.Value,
+                        Created: time.Now(),
+                        Posts: []*Post{},
+                        Follows: []string{},
+                       }
+
+        db_register(newUser)
+        return common.Request{
+                              SessionID: cookie.Value,
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"Success": true},
+                             }
+    }
 }
 
 func deleteHandler(r common.Request) {
     return
+}
+
+func homeHandler(r common.Request) common.Request {
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": false},
+                             }
+    }
+
+    username := user.Username
+    posts := make([]Post, 0)
+    for x := range user.Posts {
+        posts = append(posts, *user.Posts[x])
+    }
+    follows := user.Follows
+    gob.Register(posts)
+    gob.Register(follows)
+    return common.Request{
+                          SessionID: user.SessionID,
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{
+                                                       "LoggedIn": true,
+                                                       "Username": username,
+                                                       "Posts": posts,
+                                                       "Follows": follows,
+                                                      }, 
+                         }
+
 }
 
 func followHandler(r common.Request) {
@@ -233,7 +327,6 @@ func handleConnection(conn net.Conn) {
     dec := gob.NewDecoder(conn)
     dec.Decode(&request)
     fmt.Println(request)
-    enc := gob.NewEncoder(conn)
     var response common.Request
     switch request.Action {
         case common.LOGIN:
@@ -243,10 +336,14 @@ func handleConnection(conn net.Conn) {
             fmt.Println("Handling logout action")
         case common.REGISTER:
             fmt.Println("Handling register action")
+            response = registerHandler(request)
             // db_register(db_JSON_to_user())
         case common.DELETE:
             fmt.Println("Handling delete action")
             // db_delete_user()
+        case common.HOME:
+            fmt.Println("Handling home action")
+            response = homeHandler(request)
         case common.FOLLOW:
             fmt.Println("Handling follow action")
 			// db_update_user(request.Data["username"], request.SessionID, request.Data["follow"], "")
@@ -261,7 +358,12 @@ func handleConnection(conn net.Conn) {
             fmt.Println("Unrecognized action")
             response = common.Request{}
     }
-    enc.Encode(response)
+    fmt.Println("=========RESPONSE==========")
+    fmt.Println(response)
+    fmt.Println("===========================")
+    enc := gob.NewEncoder(conn)
+    err := enc.Encode(response)
+    fmt.Println(err)
 }
 
 

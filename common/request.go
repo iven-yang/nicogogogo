@@ -13,6 +13,7 @@ const(
     LOGOUT
     REGISTER
     DELETE
+    HOME
     FOLLOW
     POST
     FEED
