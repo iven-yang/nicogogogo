@@ -221,9 +221,11 @@ func homeHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": false},
                              }
     }
-
+	
     username := user.Username
-    posts := make([]Post, 0)
+    db_unfollow_deleted_users(username)
+	
+	posts := make([]Post, 0)
     for x := range user.Posts {
         posts = append(posts, *user.Posts[x])
     }
@@ -242,15 +244,38 @@ func homeHandler(r common.Request) common.Request {
                          }
 }
 
-func followHandler(r common.Request) {
-    // user, err := AuthenticateFetch(r.SessionID)
-    // if err != nil {
-        // return common.Request{
-                              // SessionID: "",
-                              // Action: common.RESPONSE,
-                              // Data: map[string]interface{}{"LoggedIn": false},
-                             // }
-    // }
+func followHandler(r common.Request) common.Request {
+    user, err := AuthenticateFetch(r.SessionID)
+    if err != nil {
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"LoggedIn": false},
+                             }
+    }
+	
+	if db_check_user_exists(r.Data["Follow_username"].(string)) {
+		following := false
+		for _, v := range user.Follows {
+			// Unfollow them
+			if v == r.Data["Follow_username"].(string) {
+				following = true
+				db_unfollow_user(user.Username, v)
+				break
+			}
+		}
+		
+		if !following {
+			// Follow them
+			db_update_user(user.Username, user.SessionID, r.Data["Follow_username"].(string), Post{})
+		}
+	}
+	
+	return common.Request{
+                          SessionID: user.SessionID,
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{"LoggedIn": true},
+                         }
 }
 
 func postHandler(r common.Request) common.Request {
@@ -365,6 +390,26 @@ func profileHandler(r common.Request) common.Request {
                          }
 }
 
+// unfollow a user
+func db_unfollow_user(username string, follow_username string) {
+	user := db_JSON_to_user(username)
+
+	for i, v := range user.Follows {
+		// Unfollow them
+		if v == follow_username {
+			user.Follows = append(user.Follows[:i], user.Follows[i+1:]...)
+			break
+		}
+	}
+	
+	updated_user := db_user_to_JSON(user)
+	writeerr := ioutil.WriteFile(path.Join("db/users", strings.ToLower(username)+".json"), updated_user, 0644)
+	if writeerr != nil {
+		panic(writeerr)
+	}
+}
+
+// unfollow users that don't exist
 func db_unfollow_deleted_users(username string) {
 	user := db_JSON_to_user(username)
 	follows := user.Follows
@@ -492,7 +537,7 @@ func handleConnection(conn net.Conn) {
             response = homeHandler(request)
         case common.FOLLOW:
             fmt.Println("Handling follow action")
-			//response = followHandler(request)
+			response = followHandler(request)
         case common.POST:
             fmt.Println("Handling post action")
             response = postHandler(request)

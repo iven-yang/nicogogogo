@@ -3,10 +3,7 @@ package main
 import (
     "fmt"
     "encoding/gob"
-    "encoding/json"
-    "os"
     "errors"
-    "io/ioutil"
     "strings"
     "time"
     "html/template"
@@ -91,64 +88,6 @@ func MakeCookie(SessionID string) http.Cookie {
     // generaate random 50 byte string to use as a session cookie
     expire := time.Now().AddDate(0, 0, 1)
     return http.Cookie{Name: "SessionID", Value: SessionID, Expires: expire, HttpOnly: true}
-}
-
-// Get the username of the user currently making the request
-func getUsername(r *http.Request) string {
-	if IsLoggedIn(r){
-		cookie, err := r.Cookie("SessionID")
-		if err == nil {
-			fullSessionID := cookie.Value
-
-			// Split the sessionID to Username and ID (username+random)        
-			if len(fullSessionID) >= len(fullSessionID) - (COOKIE_LENGTH * 2 + 1) {
-				return fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 + 1)]
-			}
-		}
-	}
-	return ""
-}
-
-func GetSessionID(username string) (string, error) {
-    user, ok := db[username]
-    if !ok {
-        return "", errors.New(USER_NX)
-    }
-
-    return user.SessionID, nil
-}
-
-// Is the user logged in
-func IsLoggedIn(r *http.Request) bool {
-
-    cookie, err := r.Cookie("SessionID")
-    if err != nil {
-		return false
-    }
-
-    fullSessionID := cookie.Value
-
-    // Check if cookie is larger than the minimum cookie length
-    if len(fullSessionID) <= (COOKIE_LENGTH * 2 + 1) {
-        return false
-    }
-
-    // Extract username from the session id
-    username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 + 1)]
-
-    // Get the saved Session ID for the user provided in the cookie
-    savedSessionID, err := GetSessionID(username)
-    if err != nil {
-		return false
-    }
-
-    // Check if the stored session id and the bearer session id match
-    // fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
-    if fullSessionID == savedSessionID {
-		// If you want to be really secure check IP
-		return true
-    }
-    return false
 }
 
 // register for a new account
@@ -532,7 +471,7 @@ func user_profiles(w http.ResponseWriter, r *http.Request) {
 
 // User follows someone else (must be logged in)
 func follow(w http.ResponseWriter, r *http.Request) {
-    _, err := r.Cookie("SessionID")
+    cookie, err := r.Cookie("SessionID")
     if err != nil {
         expire := time.Unix(0, 0)
         newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
@@ -540,34 +479,29 @@ func follow(w http.ResponseWriter, r *http.Request) {
         http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
         return
-    } else {
-        // username of user who is logged in
-        home_username := getUsername(r)
-        
-        r.ParseForm()
-        u := r.Form["username"]
-        username := strings.Join(u, "")
-        
-        // check to see if user you are "following" exists
-        if _, ok := db[username]; ok {
-            // check to see if you are following this user (if so, unfollow them)
-            following := false
-            for i, v := range db[home_username].Follows {
-                // Unfollow them
-                if v == username {
-                    following = true
-                    db[home_username].Follows = append(db[home_username].Follows[:i], db[home_username].Follows[i+1:]...)
-                    break
-                }
-            }
-            
-            if !following {
-                // Follow them
-                db[home_username].Follows = append(db[home_username].Follows, db[username].Username)
-            }
-        }
-        http.Redirect(w, r, path.Join("/user", username), http.StatusSeeOther)
     }
+	
+	fullSessionID := cookie.Value
+	
+	r.ParseForm()
+	u := r.Form["username"]
+	follow_username := strings.Join(u, "")
+	
+    query := common.Request{SessionID: fullSessionID,
+                           Action: common.FOLLOW,
+                           Data: map[string]interface{}{"Follow_username": follow_username}}
+    response, _ := QueryBackend(query)
+	
+	if !response.Data["LoggedIn"].(bool) { // only view profiles if you are logged in
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
+        http.Redirect(w, r, "/login", http.StatusSeeOther)
+        return
+    }
+	
+	http.Redirect(w, r, path.Join("/user", follow_username), http.StatusSeeOther)
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
@@ -623,54 +557,6 @@ func delete_account(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &newcookie)
     http.Redirect(w, r, "/", http.StatusSeeOther)
 }
-
-func db_register(user User) {
-	fmt.Println("JSON DATA:")
-	newUserBytes := db_user_to_JSON(user)
-	fmt.Println(string(newUserBytes)[:])
-	writeerr := ioutil.WriteFile(path.Join("db/users", user.Username+".json"), newUserBytes, 0644)
-	if writeerr != nil {
-		panic(writeerr)
-	}
-}
-
-func db_delete_user(username string) {
-	err := os.Remove(path.Join("db/users", username+".json"))
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	fmt.Println("User Removed: ", username)
-}
-
-func db_check_user_exists(username string) bool {
-	if _, err := os.Stat(path.Join("db/users", username+".json")); !os.IsNotExist(err) {
-		return true
-	}
-	return false
-}
-
-// converting user struct to JSON string
-func db_user_to_JSON(user User) []byte {
-	JSON_string, _ := json.MarshalIndent(user, "", "    ")
-	return JSON_string
-}
-
-// converting JSON string to user struct
-func db_JSON_to_user(username string) User {
-	dat, err := ioutil.ReadFile(path.Join("db/users", username+".json"))
-	if err != nil {
-		panic(err.Error())
-	}
-	
-	var user User
-	if err := json.Unmarshal(dat, &user); err != nil {
-		panic(err)
-	}
-	return user
-}
-
-var db = map[string]*User{}
 
 func main() {
     posts := make([]Post, 0)
