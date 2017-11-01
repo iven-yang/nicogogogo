@@ -38,8 +38,9 @@ type User struct {
     Posts []*Post
 }
 
+// Generates a cookie for a given username to be used as a session ID
 func GenCookie(username string) http.Cookie {
-    // generaate random 50 byte string to use as a session cookie
+    // generate random 50 byte string to use as a session cookie
     randomValue := make([]byte, COOKIE_LENGTH)
     rand.Read(randomValue)
     cookieValue := strings.ToLower(username) + ":" + fmt.Sprintf("%X", randomValue)
@@ -61,13 +62,14 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
         return User{}, errors.New(USER_NX)
     }
 
+    // Load user struct from json file
     user := db_JSON_to_user(username)
 
     // Get the saved Session ID for the user provided in the cookie
     savedSessionID := user.SessionID
 
     // Check if the stored session id and the bearer session id match
-    // fmt.Printf("Sent Session ID: %s; Saved Session ID: %s\n", fullSessionID, savedSessionID)
+    // Return user object and nil if session ID's match
     if len(savedSessionID) > (COOKIE_LENGTH * 2 + 1) && fullSessionID == savedSessionID {
         return user, nil
     }
@@ -75,8 +77,11 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
 }
 
 func loginHandler(r common.Request) common.Request {
+    // If GET request
     if r.Data["Method"].(string) == "GET" {
+        // Check if the user already has an active session
         _, err := AuthenticateFetch(r.SessionID)
+        // If they don't then respond with LoggedIn set to false
         if err != nil {
             return common.Request{
                                   SessionID: "",
@@ -84,12 +89,15 @@ func loginHandler(r common.Request) common.Request {
                                   Data: map[string]interface{}{"LoggedIn": false},
                                  }
         }
+        // Otherwise respond with LoggedIn set to true
         return common.Request{
                               SessionID: "",
                               Action: common.RESPONSE,
                               Data: map[string]interface{}{"LoggedIn": true}, 
                              }
     } else {
+        // If POST request
+        // Check that the user trying to login exists, then load user data from json file
         if !db_check_user_exists(r.Data["Username"].(string)) {
             return common.Request{
                                   SessionID: "",
@@ -98,7 +106,9 @@ func loginHandler(r common.Request) common.Request {
                                  }
         }
         user := db_JSON_to_user(r.Data["Username"].(string))
+        // Compare stored hash and hash of password provided by user
         err := bcrypt.CompareHashAndPassword(user.Hash, []byte(r.Data["Password"].(string)))
+        // If hashes don't match then send response with LoggedIn set to false
         if err != nil {
             return common.Request{
                                   SessionID: "",
@@ -106,6 +116,8 @@ func loginHandler(r common.Request) common.Request {
                                   Data: map[string]interface{}{"LoggedIn": false},
                                  }
         }
+        // Otherwise, generate a new SessionID for the logged in user and send response
+        // with new SessionID and LoggedIn set to true
         cookie := GenCookie(user.Username)
         user.SessionID = cookie.Value
         db_update_user(user.Username, user.SessionID, "", Post{})
@@ -118,7 +130,9 @@ func loginHandler(r common.Request) common.Request {
 }
 
 func logoutHandler(r common.Request) common.Request {
-	user, err := AuthenticateFetch(r.SessionID)
+    // First make sure that the SessionID requesting to logout is valid
+    user, err := AuthenticateFetch(r.SessionID)
+    // If not then respond with false
     if err != nil {
         return common.Request{
                               SessionID: "",
@@ -126,7 +140,8 @@ func logoutHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"Success": false},
                              }
     }
-	db_update_user(user.Username, "", "", Post{})
+    // Otherwise, set stored SessionID to empty string and send success to webserver
+    db_update_user(user.Username, "", "", Post{})
     return common.Request{
                           SessionID: "",
                           Action: common.RESPONSE,
@@ -135,6 +150,7 @@ func logoutHandler(r common.Request) common.Request {
 }
 
 func registerHandler(r common.Request) common.Request {
+    // Handle GET request
     if r.Data["Method"].(string) == "GET" {
         _, err := AuthenticateFetch(r.SessionID)
         if err != nil {
@@ -144,6 +160,7 @@ func registerHandler(r common.Request) common.Request {
                                   Data: map[string]interface{}{"LoggedIn": false},
                                  }
         }
+        // Send LoggedIn: true back to webserver if SessionID already exists
         return common.Request{
                               SessionID: "",
                               Action: common.RESPONSE,
@@ -151,9 +168,11 @@ func registerHandler(r common.Request) common.Request {
                              }
 
     } else {
+        // Handle POST request
         username := r.Data["Username"].(string)
         password := r.Data["Password"].(string)
 
+        // Check username availability
         if db_check_user_exists(username) {
             return common.Request{
                                   SessionID: "",
@@ -163,6 +182,7 @@ func registerHandler(r common.Request) common.Request {
                                  }
         }
 
+        // Hash password
         hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
         if err != nil {
@@ -174,8 +194,10 @@ func registerHandler(r common.Request) common.Request {
                                  }
         }
 
+        // Generate SessionID
         cookie := GenCookie(username)
 
+        // Create new user and save in data store
         newUser := User{
                         Username: username,
                         Hash: hash,
@@ -186,6 +208,7 @@ func registerHandler(r common.Request) common.Request {
                        }
 
         db_register(newUser)
+        // Respond to webserver with success
         return common.Request{
                               SessionID: cookie.Value,
                               Action: common.RESPONSE,
@@ -195,6 +218,7 @@ func registerHandler(r common.Request) common.Request {
 }
 
 func deleteHandler(r common.Request) common.Request {
+    // Authenticate request
     user, err := AuthenticateFetch(r.SessionID)
     if err != nil {
         return common.Request{
@@ -203,8 +227,9 @@ func deleteHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"Success": false},
                              }
     }
-	db_delete_user(user.Username)
-	fmt.Println(user.Username, " has deleted their account")
+    // If authenticated, delete user from datastore and respond to webserver with success
+    db_delete_user(user.Username)
+    fmt.Println(user.Username, " has deleted their account")
     return common.Request{
                           SessionID: "",
                           Action: common.RESPONSE,
@@ -213,6 +238,7 @@ func deleteHandler(r common.Request) common.Request {
 }
 
 func homeHandler(r common.Request) common.Request {
+    // Authenticate user
     user, err := AuthenticateFetch(r.SessionID)
     if err != nil {
         return common.Request{
@@ -222,14 +248,16 @@ func homeHandler(r common.Request) common.Request {
                              }
     }
 	
+    // Build response for webserver with user's posts and follows
     username := user.Username
     db_unfollow_deleted_users(username)
 	
-	posts := make([]Post, 0)
+    posts := make([]Post, 0)
     for x := range user.Posts {
         posts = append(posts, *user.Posts[x])
     }
     follows := user.Follows
+    // Register types with gob and send response to webserver
     gob.Register(posts)
     gob.Register(follows)
     return common.Request{
@@ -245,6 +273,7 @@ func homeHandler(r common.Request) common.Request {
 }
 
 func followHandler(r common.Request) common.Request {
+    // Authenticate request
     user, err := AuthenticateFetch(r.SessionID)
     if err != nil {
         return common.Request{
@@ -254,31 +283,34 @@ func followHandler(r common.Request) common.Request {
                              }
     }
 	
-	if db_check_user_exists(r.Data["Follow_username"].(string)) {
-		following := false
-		for _, v := range user.Follows {
-			// Unfollow them
-			if v == r.Data["Follow_username"].(string) {
-				following = true
-				db_unfollow_user(user.Username, v)
-				break
-			}
-		}
-		
-		if !following {
-			// Follow them
-			db_update_user(user.Username, user.SessionID, r.Data["Follow_username"].(string), Post{})
-		}
-	}
+    // Verify that user to be followed exists and add necessary links to data store
+    if db_check_user_exists(r.Data["Follow_username"].(string)) {
+        following := false
+        for _, v := range user.Follows {
+            // Unfollow them
+            if v == r.Data["Follow_username"].(string) {
+                following = true
+                db_unfollow_user(user.Username, v)
+                break
+            }
+        }
+        
+        if !following {
+            // Follow them
+            db_update_user(user.Username, user.SessionID, r.Data["Follow_username"].(string), Post{})
+        }
+    }
 	
-	return common.Request{
-                          SessionID: user.SessionID,
-                          Action: common.RESPONSE,
-                          Data: map[string]interface{}{"LoggedIn": true},
-                         }
+    // Respond to webserver
+    return common.Request{
+                      SessionID: user.SessionID,
+                      Action: common.RESPONSE,
+                      Data: map[string]interface{}{"LoggedIn": true},
+                     }
 }
 
 func postHandler(r common.Request) common.Request {
+    // Authenticate request
     user, err := AuthenticateFetch(r.SessionID)
     if err != nil {
         return common.Request{
@@ -287,6 +319,7 @@ func postHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": false},
                              }
     }
+    // Create new post object and save in datastore. Create response for webserver
     new_post := Post{
                      Content: r.Data["Status"].(string), 
                      Time: time.Now(),
@@ -304,6 +337,7 @@ func postHandler(r common.Request) common.Request {
 }
 
 func browseHandler(r common.Request) common.Request{
+    // Authenticate request
     user, err := AuthenticateFetch(r.SessionID)
     if err != nil {
         return common.Request{
@@ -313,6 +347,7 @@ func browseHandler(r common.Request) common.Request{
                              }
     }
 
+    // Get other users from data store and create response for webserver
     username := strings.ToLower(user.Username)
     users := db_get_users()
     other_users := make([]string, len(users)-1)
@@ -341,25 +376,25 @@ func profileHandler(r common.Request) common.Request {
                              }
     }
 	
-	profile_username := r.Data["Profile_user"].(string)
-	
-	// Check if the requested user actually exists
-	if !db_check_user_exists(profile_username) {
-		return common.Request{
-							  SessionID: user.SessionID,
-							  Action: common.RESPONSE,
-							  Data: map[string]interface{}{
-														   "LoggedIn": true,
-														   "Username": "",
-														  }, 
-							 }
-	}
-	
-	// check to see if followed users' accounts still exist
-	db_unfollow_deleted_users(profile_username)
-	
-	profile_user := db_JSON_to_user(profile_username)
-	
+    profile_username := r.Data["Profile_user"].(string)
+    
+    // Check if the requested user actually exists
+    if !db_check_user_exists(profile_username) {
+        return common.Request{
+                              SessionID: user.SessionID,
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{
+                                                           "LoggedIn": true,
+                                                           "Username": "",
+                                                          }, 
+                             }
+    }
+    
+    // check to see if followed users' accounts still exist
+    db_unfollow_deleted_users(profile_username)
+    
+    profile_user := db_JSON_to_user(profile_username)
+    
     posts := make([]Post, 0)
     for x := range profile_user.Posts {
         posts = append(posts, *user.Posts[x])
@@ -383,7 +418,7 @@ func profileHandler(r common.Request) common.Request {
                           Data: map[string]interface{}{
                                                        "LoggedIn": true,
                                                        "Following": following,
-													   "Username": profile_username,
+                                                       "Username": profile_username,
                                                        "Posts": posts,
                                                        "Follows": follows,
                                                       }, 
@@ -512,12 +547,14 @@ func db_JSON_to_user(username string) User {
 }
 
 func handleConnection(conn net.Conn) {
+    // Receive request from webserver and decode the gob'ed object
     request := common.Request{}
     conn.SetReadDeadline(time.Now().Add(30 * time.Second))
     defer conn.Close()
     dec := gob.NewDecoder(conn)
     dec.Decode(&request)
     fmt.Println(request)
+    // Switch based on the action provided in the requests Action field
     var response common.Request
     switch request.Action {
         case common.LOGIN:
@@ -554,6 +591,7 @@ func handleConnection(conn net.Conn) {
     fmt.Println("=========RESPONSE==========")
     fmt.Println(response)
     fmt.Println("===========================")
+    // Send response back to webserver
     enc := gob.NewEncoder(conn)
     err := enc.Encode(response)
     fmt.Println(err)

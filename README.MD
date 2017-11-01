@@ -1,5 +1,7 @@
 Project Part 2
 ==============
+To start the webserver `go run server.go`
+To start the application data server `go run backend.go`
 
 Messages Sent between web server and application data server
 -------------------------------------------------------------
