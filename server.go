@@ -383,23 +383,39 @@ func home(w http.ResponseWriter, r *http.Request) {
 }
 
 func post(w http.ResponseWriter, r *http.Request) {
-    if !IsLoggedIn(r) {
+    cookie, err := r.Cookie("SessionID")
+    if err != nil {
+        expire := time.Unix(0, 0)
+        newcookie := http.Cookie{Name: "SessionID", Value: "", Expires: expire, HttpOnly: true}
+
+        http.SetCookie(w, &newcookie)
         http.Redirect(w, r, "/login", http.StatusSeeOther)
-    } else {
-        username := getUsername(r)
-        
-        r.ParseForm()
-        p_d := r.Form["status"]
-        
-        post_data := strings.Join(p_d, "")
-        
-        if len(post_data) > 0 && len(post_data) < 101{
-            // Time formatting string guidelines: https://golang.org/src/time/format.go
-            new_post := Post{Content: post_data, Time: time.Now(), Timestr: time.Now().Format("Jan 2 2006: 3:04 pm")}
-            db[username].Posts = append(db[username].Posts, &new_post)
-        }
-        http.Redirect(w, r, "/home", http.StatusSeeOther)
+        return
     }
+    
+    fullSessionID := cookie.Value
+
+    r.ParseForm()
+    p_d := r.Form["status"]
+    
+    post_data := strings.Join(p_d, "")
+    
+    if len(post_data) > 0 && len(post_data) < 101{
+        // Time formatting string guidelines: https://golang.org/src/time/format.go
+        query := common.Request{
+                                SessionID: fullSessionID,
+                                Action: common.POST,
+                                Data: map[string]interface{}{"Status": post_data},
+                               }
+
+        _, err := QueryBackend(query)
+        if err != nil {
+            fmt.Println(BACKEND_ERR)
+            http.Redirect(w, r, "/home", http.StatusSeeOther)
+            return
+        }
+    }
+    http.Redirect(w, r, "/home", http.StatusSeeOther)
 }
 
 // look through other users (must be logged in)
