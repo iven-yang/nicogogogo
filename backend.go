@@ -64,15 +64,15 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
 
     file_lock.Lock()
     defer file_lock.Unlock()
-	
+    
     if !db_check_user_exists(username) {
         return User{}, errors.New(USER_NX)
     }
 
     // Load user struct from json file
     user := db_JSON_to_user(username)
-	
-	// Get the saved Session ID for the user provided in the cookie
+    
+    // Get the saved Session ID for the user provided in the cookie
     savedSessionID := user.SessionID
 
     // Check if the stored session id and the bearer session id match
@@ -105,13 +105,13 @@ func loginHandler(r common.Request) common.Request {
     } else {
         // If POST request
         // Check that the user trying to login exists, then load user data from json file
-		
-		username := r.Data["Username"].(string)
-		
-		file_lock := get_lock(strings.ToLower(username))
-		file_lock.Lock()
-		defer file_lock.Unlock()
-		
+        
+        username := r.Data["Username"].(string)
+        
+        file_lock := get_lock(strings.ToLower(username))
+        file_lock.Lock()
+        defer file_lock.Unlock()
+        
         if !db_check_user_exists(username) {
             return common.Request{
                                   SessionID: "",
@@ -135,7 +135,7 @@ func loginHandler(r common.Request) common.Request {
         cookie := GenCookie(user.Username)
         user.SessionID = cookie.Value
         db_update_user(user.Username, user.SessionID, "", Post{})
-		
+        
         return common.Request{
                               SessionID: user.SessionID,
                               Action: common.RESPONSE,
@@ -146,8 +146,8 @@ func loginHandler(r common.Request) common.Request {
 
 func logoutHandler(r common.Request) common.Request {
     // First make sure that the SessionID requesting to logout is valid
-	
-	
+    
+    
     user, err := AuthenticateFetch(r.SessionID)
     // If not then respond with false
     if err != nil {
@@ -163,7 +163,7 @@ func logoutHandler(r common.Request) common.Request {
     file_lock.Lock()
     defer file_lock.Unlock()
     db_update_user(user.Username, "", "", Post{})
-	
+    
     return common.Request{
                       SessionID: "",
                       Action: common.RESPONSE,
@@ -193,12 +193,12 @@ func registerHandler(r common.Request) common.Request {
         // Handle POST request
         username := r.Data["Username"].(string)
         password := r.Data["Password"].(string)
-		
+        
         file_lock := get_lock(strings.ToLower(username))
 
         file_lock.Lock()
         defer file_lock.Unlock()
-		
+        
         // Check username availability
         if db_check_user_exists(username) {
             return common.Request{
@@ -235,7 +235,7 @@ func registerHandler(r common.Request) common.Request {
                        }
 
         db_register(newUser)
-		
+        
         // Respond to webserver with success
         return common.Request{
                               SessionID: cookie.Value,
@@ -261,7 +261,7 @@ func deleteHandler(r common.Request) common.Request {
     file_lock.Lock()
     defer file_lock.Unlock()
     db_delete_user(user.Username)
-	
+    
     fmt.Println(user.Username, " has deleted their account")
     return common.Request{
                           SessionID: "",
@@ -280,17 +280,17 @@ func homeHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": false},
                              }
     }
-	
+    
     // Build response for webserver with user's posts and follows
     username := user.Username
-	
+    
     file_lock := get_lock(strings.ToLower(username))
 
     file_lock.Lock()
     defer file_lock.Unlock()
-	
+    
     db_unfollow_deleted_users(username)
-	
+    
     posts := make([]Post, 0)
     for x := range user.Posts {
         posts = append(posts, *user.Posts[x])
@@ -321,19 +321,19 @@ func followHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": false},
                              }
     }
-	
+    
     // Verify that user to be followed exists and add necessary links to data store
     follow_username := r.Data["Follow_username"].(string)
 
     file_lock_follow_user := get_lock(strings.ToLower(follow_username))
     file_lock_follow_user.Lock()
-	
+    
     if db_check_user_exists(follow_username) {
-		file_lock_follow_user.Unlock()
-		
-		file_lock_current_user := get_lock(strings.ToLower(user.Username))
-		file_lock_current_user.Lock()
-		
+        file_lock_follow_user.Unlock()
+        
+        file_lock_current_user := get_lock(strings.ToLower(user.Username))
+        file_lock_current_user.Lock()
+        
         following := false
         for _, v := range user.Follows {
             // Unfollow them
@@ -348,12 +348,12 @@ func followHandler(r common.Request) common.Request {
             // Follow them
             db_update_user(user.Username, user.SessionID, follow_username, Post{})
         }
-		file_lock_current_user.Unlock()
-		
+        file_lock_current_user.Unlock()
+        
     } else {
-		file_lock_follow_user.Unlock()
-	}
-	
+        file_lock_follow_user.Unlock()
+    }
+    
     // Respond to webserver
     return common.Request{
                       SessionID: user.SessionID,
@@ -378,13 +378,13 @@ func postHandler(r common.Request) common.Request {
                      Time: time.Now(),
                      Timestr: time.Now().Format("Jan 2 2006: 3:04 pm"),
                     }
-	
+    
     file_lock := get_lock(strings.ToLower(user.Username))
 
     file_lock.Lock()
     defer file_lock.Unlock()
     db_update_user(user.Username, "", "", new_post)
-	
+    
     return common.Request{
                       SessionID: user.SessionID,
                       Action: common.RESPONSE,
@@ -411,9 +411,9 @@ func browseHandler(r common.Request) common.Request{
     users := db_get_users()
     other_users := make([]string, len(users)-1)
     for i := range users {
-	if users[i] != username {
-	    other_users = append(other_users, users[i])
-	}
+    if users[i] != username {
+        other_users = append(other_users, users[i])
+    }
     }
 
     gob.Register(other_users)
@@ -434,13 +434,13 @@ func profileHandler(r common.Request) common.Request {
                               Data: map[string]interface{}{"LoggedIn": false},
                              }
     }
-	
+    
     profile_username := r.Data["Profile_user"].(string)
     
     file_lock := get_lock(strings.ToLower(profile_username))
     file_lock.Lock()
     defer file_lock.Unlock()
-	
+    
     // Check if the requested user actually exists
     if !db_check_user_exists(profile_username) {
         return common.Request{
@@ -465,16 +465,16 @@ func profileHandler(r common.Request) common.Request {
     follows := profile_user.Follows
     gob.Register(posts)
     gob.Register(follows)
-	
-	// Check to see if you are following this user (for the button to display follow or unfollow)
-	following := "Follow"
-	for _, v := range user.Follows {
-		if v == profile_username {
-			following = "Unfollow"
-			break
-		}
-	}
-	
+    
+    // Check to see if you are following this user (for the button to display follow or unfollow)
+    following := "Follow"
+    for _, v := range user.Follows {
+        if v == profile_username {
+            following = "Unfollow"
+            break
+        }
+    }
+    
     return common.Request{
                           SessionID: user.SessionID,
                           Action: common.RESPONSE,
@@ -490,85 +490,85 @@ func profileHandler(r common.Request) common.Request {
 
 // unfollow a user
 func db_unfollow_user(username string, follow_username string) {
-	file_path := path.Join("db/users", strings.ToLower(username)+".json")
-	
-	if _, err := os.Stat(file_path); os.IsNotExist(err) {
-		return
-	}
-	
-	user := db_JSON_to_user(username)
+    file_path := path.Join("db/users", strings.ToLower(username)+".json")
+    
+    if _, err := os.Stat(file_path); os.IsNotExist(err) {
+        return
+    }
+    
+    user := db_JSON_to_user(username)
 
-	for i, v := range user.Follows {
-		// Unfollow them
-		if v == follow_username {
-			user.Follows = append(user.Follows[:i], user.Follows[i+1:]...)
-			break
-		}
-	}
-	
-	updated_user := db_user_to_JSON(user)
+    for i, v := range user.Follows {
+        // Unfollow them
+        if v == follow_username {
+            user.Follows = append(user.Follows[:i], user.Follows[i+1:]...)
+            break
+        }
+    }
+    
+    updated_user := db_user_to_JSON(user)
 
-	writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
+    writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
 
-	if writeerr != nil {
-		panic(writeerr)
-	}
+    if writeerr != nil {
+        panic(writeerr)
+    }
 }
 
 // unfollow users that don't exist
 func db_unfollow_deleted_users(username string) {
-	file_path := path.Join("db/users", strings.ToLower(username)+".json")
-	
-	if _, err := os.Stat(file_path); os.IsNotExist(err) {
-		return
-	}
-	user := db_JSON_to_user(username)
+    file_path := path.Join("db/users", strings.ToLower(username)+".json")
+    
+    if _, err := os.Stat(file_path); os.IsNotExist(err) {
+        return
+    }
+    user := db_JSON_to_user(username)
 
-	follows := user.Follows
-	
-	offset := 0
-	for i, followed := range follows {
-		if !db_check_user_exists(followed) {
-			// unfollow user if account doesn't exist
-			user.Follows = append(user.Follows[:i-offset], user.Follows[i+1-offset:]...)
-			offset = offset + 1
-		}
-	}
-	updated_user := db_user_to_JSON(user)
-	
-	writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
-	
-	if writeerr != nil {
-		panic(writeerr)
-	}
+    follows := user.Follows
+    
+    offset := 0
+    for i, followed := range follows {
+        if !db_check_user_exists(followed) {
+            // unfollow user if account doesn't exist
+            user.Follows = append(user.Follows[:i-offset], user.Follows[i+1-offset:]...)
+            offset = offset + 1
+        }
+    }
+    updated_user := db_user_to_JSON(user)
+    
+    writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
+    
+    if writeerr != nil {
+        panic(writeerr)
+    }
 }
 
 // update user JSON file
 func db_update_user(username string, sessionid string, follow_username string, post Post){
-	file_path := path.Join("db/users", strings.ToLower(username)+".json")
-	
-	if _, err := os.Stat(file_path); os.IsNotExist(err) {
-		return
-	}
-	user := db_JSON_to_user(username)
-	
-	if sessionid != "" {
-		user.SessionID = sessionid
-	}
-	if follow_username != "" {
-		user.Follows = append(user.Follows, follow_username)
-	}
-	if post.Content != "" {
-		user.Posts = append(user.Posts, &post)
-	}
-	
-	updated_user := db_user_to_JSON(user)
-	
-	writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
+    file_path := path.Join("db/users", strings.ToLower(username)+".json")
+    
+    if _, err := os.Stat(file_path); os.IsNotExist(err) {
+        return
+    }
+    user := db_JSON_to_user(username)
+    
+    if sessionid != "" {
+        user.SessionID = sessionid
+    }
+    if follow_username != "" {
+        user.Follows = append(user.Follows, follow_username)
+    }
+    if post.Content != "" {
+        user.Posts = append(user.Posts, &post)
+    }
+    
+    updated_user := db_user_to_JSON(user)
+    
+    writeerr := ioutil.WriteFile(file_path, updated_user, 0644)
 
-	if writeerr != nil {
-		panic(writeerr)
-	}
+    if writeerr != nil {
+        panic(writeerr)
+    }
 }
 
 // make a JSON file for new user
@@ -577,12 +577,12 @@ func db_register(user User) {
     newUserBytes := db_user_to_JSON(user)
     fmt.Println(string(newUserBytes)[:])
     
-	file_path := path.Join("db/users", strings.ToLower(user.Username)+".json")
+    file_path := path.Join("db/users", strings.ToLower(user.Username)+".json")
 
-	if _, err := os.Stat(file_path); !os.IsNotExist(err) {
-		return
-	}
-	writeerr := ioutil.WriteFile(file_path, newUserBytes, 0644)
+    if _, err := os.Stat(file_path); !os.IsNotExist(err) {
+        return
+    }
+    writeerr := ioutil.WriteFile(file_path, newUserBytes, 0644)
 
     if writeerr != nil {
         panic(writeerr)
@@ -592,9 +592,9 @@ func db_register(user User) {
 func db_get_users() []string {
     users := make([]string, 0)
     
-	files, err := ioutil.ReadDir("./db/users")
+    files, err := ioutil.ReadDir("./db/users")
     
-	if err != nil {
+    if err != nil {
         log.Fatal(err)
     }
 
@@ -608,8 +608,8 @@ func db_get_users() []string {
 func db_delete_user(username string) {
     file_path := path.Join("db/users", strings.ToLower(username) + ".json")
 
-	err := os.Remove(file_path)
-	
+    err := os.Remove(file_path)
+    
     if err != nil {
         fmt.Println(err.Error())
         return
@@ -620,9 +620,9 @@ func db_delete_user(username string) {
 // check if a JSON file for a user exists
 func db_check_user_exists(username string) bool {
     file_path := path.Join("db/users", strings.ToLower(username) + ".json")
-	
-	if _, err := os.Stat(file_path); !os.IsNotExist(err) {
-		return true
+    
+    if _, err := os.Stat(file_path); !os.IsNotExist(err) {
+        return true
     }
     return false
 }
@@ -635,10 +635,10 @@ func db_user_to_JSON(user User) []byte {
 
 // converting JSON string to user struct
 func db_JSON_to_user(username string) User {
-	file_path := path.Join("db/users", strings.ToLower(username)+".json")
-	
+    file_path := path.Join("db/users", strings.ToLower(username)+".json")
+    
     dat, err := ioutil.ReadFile(file_path)
-	
+    
     if err != nil {
         panic(err.Error())
     }
@@ -651,12 +651,12 @@ func db_JSON_to_user(username string) User {
 }
 
 func get_lock(file string) *sync.Mutex{
-	if val, ok := mutex[file]; ok {
-		return val
-	} else {
-		mutex[file] = &sync.Mutex{}
-		return mutex[file]
-	}
+    if val, ok := mutex[file]; ok {
+        return val
+    } else {
+        mutex[file] = &sync.Mutex{}
+        return mutex[file]
+    }
 }
 
 func handleConnection(conn net.Conn) {
@@ -675,7 +675,7 @@ func handleConnection(conn net.Conn) {
             response = loginHandler(request)
         case common.LOGOUT:
             fmt.Println("Handling logout action")
-			response = logoutHandler(request)
+            response = logoutHandler(request)
         case common.REGISTER:
             fmt.Println("Handling register action")
             response = registerHandler(request)
@@ -687,7 +687,7 @@ func handleConnection(conn net.Conn) {
             response = homeHandler(request)
         case common.FOLLOW:
             fmt.Println("Handling follow action")
-			response = followHandler(request)
+            response = followHandler(request)
         case common.POST:
             fmt.Println("Handling post action")
             response = postHandler(request)
@@ -696,7 +696,7 @@ func handleConnection(conn net.Conn) {
             response = browseHandler(request)
         case common.PROFILE:
             fmt.Println("Handling profile action")
-			response = profileHandler(request)
+            response = profileHandler(request)
         default:
             fmt.Println("Unrecognized action")
             response = common.Request{}
