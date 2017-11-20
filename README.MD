@@ -1,4 +1,4 @@
-Project Part 2
+Project Part 3
 ==============
 To start the webserver `go run server.go`
 To start the application data server `go run backend.go`
@@ -24,4 +24,25 @@ Data is stored in the `db/users` directory. Each user gets its own json file. Wh
 
 Modifications to the user interface from the first part
 -------------------------------------------------------
-Added missing components (profile for easiness to view a specific user's messages, ability to delete account, enforcing of 100 character message limit)
+Added missing components (profile for easiness to view a specific user's messages, ability to delete account, enforcing of 100 character message limit).
+
+Modifications to the application data server made in part three
+---------------------------------------------------------------
+1. Main loop modified to start a new goroutine to handle each individual connection
+2. Global map of usernames to mutexes created for file locking to avoid race conditions between operations
+3. Fixed an error that caused the backend server to crash when browsing profiles from a newly created account
+
+Avoiding race conditions
+------------------------
+Our application data server operates off of a single file per user object that gets created. Due to this, we do not need to lock the entire database anytime a transaction takes place. Instead, we can lock the user file(s) that will be read and modified in each request handler function. To do this, we created a global map `mutexes` that maps usernames to individual locks. The flow for a typical request to the application data server now looks as follows:
+
+1. The application data server listens for connections.
+2. The application data server accepts a connection and starts a goroutine to handle this connection.
+3. The created goroutine hits a switch case based on the type of action that will be performed.
+4. The goroutine enters the appropriate handler function for the requested action.
+5. The handler function fetches any locks that may be required to perform the operation. Only one lock can be held by a single handler function at any given time to avoid deadlocks.
+6. The handler function acquires the lock for the necessary file.
+7. The handler function performs any read and write operations on the locked file.
+8. The handler function releases the lock and responds to the connection request that was accepted.
+
+With this data flow, only one handler function, and thus one goroutine, can operate on a given user file at any point in time. Additionally, handler functions are limited to acquiring only a single lock at any point in their execution to avoid deadlocks that may be caused by context switches. 
