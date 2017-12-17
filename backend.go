@@ -20,9 +20,15 @@ import(
 )
 const COOKIE_LENGTH = 25
 const LISTENING_PORT = "1337"
+var BACKEND_SERVERS [3]string
+
 const USER_NX = "User does not exist."
 const INVALID_COOKIE = "Invalid cookie"
 const SESSIONID_MISMATCH = "Sent session ID does not match saved session ID"
+const BACKEND_ERR = "Error communicating with backend server"
+const PROTOCOL = "tcp"
+const BACKEND_ADDR = "localhost"
+const BACKEND_LOC = BACKEND_ADDR + ":" + LISTENING_PORT
 
 var mutex = make(map[string]*sync.Mutex)
 
@@ -39,6 +45,29 @@ type User struct {
     Created time.Time
     Follows []string
     Posts []*Post
+}
+
+func QueryBackend(r common.Request, server string) (common.Request, error){
+    fmt.Println("Querying backend")
+    fmt.Println(r)
+
+    conn, err := net.Dial(PROTOCOL, server)
+    if err != nil {
+        fmt.Println("Connection error")
+        return common.Request{}, errors.New(BACKEND_ERR)
+    }
+    defer conn.Close()
+	// If there is no response in 30 seconds, move on
+    conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+
+    encoder := gob.NewEncoder(conn)
+    encoder.Encode(r)
+
+    request := common.Request{}
+    dec := gob.NewDecoder(conn)
+    dec.Decode(&request)
+    fmt.Println(request)
+    return request, nil
 }
 
 // Generates a cookie for a given username to be used as a session ID
@@ -656,7 +685,54 @@ func get_lock(file string) *sync.Mutex{
     } else {
         mutex[file] = &sync.Mutex{}
         return mutex[file]
-    }
+	}
+}
+
+func dist_lock(key string) []string{
+	query := common.Request{
+                      SessionID: "",
+                      Action: common.LOCK,
+                      Data: map[string]interface{}{"key": key},
+                     }
+	
+	servers := []string{}
+	
+	// tell all backend servers (except yourself) to lock, and wait for them to respond or timeout
+	for _, server := range BACKEND_SERVERS {
+		if server != BACKEND_LOC{
+			response, err := QueryBackend(query, server)
+			if err == nil {
+				if response.Data["OK"].(bool) {
+					servers = append(servers, server)
+				}
+			}
+		}
+	}
+	
+	return servers
+}
+
+func dist_unlock(lock *sync.Mutex) {
+	
+}
+
+func lockHandler(lock *sync.Mutex) common.Request{
+    
+	query := common.Request{
+                      SessionID: "",
+                      Action: common.LOCK,
+                      Data: map[string]interface{}{"lock": lock},
+                     }
+	return query
+}
+
+func unlockHandler(lock *sync.Mutex) common.Request{
+    query := common.Request{
+                      SessionID: "",
+                      Action: common.UNLOCK,
+                      Data: map[string]interface{}{"lock": lock},
+                     }
+	return query
 }
 
 func handleConnection(conn net.Conn) {
@@ -697,6 +773,12 @@ func handleConnection(conn net.Conn) {
         case common.PROFILE:
             fmt.Println("Handling profile action")
             response = profileHandler(request)
+		case common.LOCK:
+            fmt.Println("Handling locking lock")
+            //response = lockHandler(request)
+		case common.UNLOCK:
+            fmt.Println("Handling unlocking lock")
+            //response = unlockHandler(request)
         default:
             fmt.Println("Unrecognized action")
             response = common.Request{}
@@ -727,6 +809,11 @@ func mainLoop() {
 
 func main() {
     fmt.Println("Hello world!")
+	
+	BACKEND_SERVERS[0] = "localhost:1337"
+	BACKEND_SERVERS[1] = "localhost:1338"
+	BACKEND_SERVERS[2] = "localhost:1339"
+	
     if _, err := os.Stat("db/users"); os.IsNotExist(err) {
         os.MkdirAll("db/users", 0755)
     }
