@@ -18,6 +18,7 @@ import(
     "golang.org/x/crypto/bcrypt"
     "encoding/gob"
 )
+
 const COOKIE_LENGTH = 25
 const LISTENING_PORT = "1337"
 var BACKEND_SERVERS [3]string
@@ -139,7 +140,7 @@ func loginHandler(r common.Request) common.Request {
         
         servers := dist_lock(strings.ToLower(username))
     
-		defer dist_unlock(strings.ToLower(username), servers)
+        defer dist_unlock(strings.ToLower(username), servers)
         
         if !db_check_user_exists(username) {
             return common.Request{
@@ -164,6 +165,8 @@ func loginHandler(r common.Request) common.Request {
         cookie := GenCookie(user.Username)
         user.SessionID = cookie.Value
         db_update_user(user.Username, user.SessionID, "", Post{})
+        data, _ := db_read_file(user.Username)
+        postFile(user.Username, data)
         
         return common.Request{
                               SessionID: user.SessionID,
@@ -192,6 +195,8 @@ func logoutHandler(r common.Request) common.Request {
 	defer dist_unlock(strings.ToLower(user.Username), servers)
     
     db_update_user(user.Username, "", "", Post{})
+    data, _ := db_read_file(user.Username)
+    postFile(user.Username, data)
     
     return common.Request{
                       SessionID: "",
@@ -225,7 +230,7 @@ func registerHandler(r common.Request) common.Request {
         
         servers := dist_lock(strings.ToLower(username))
     
-		defer dist_unlock(strings.ToLower(username), servers)
+        defer dist_unlock(strings.ToLower(username), servers)
         
         // Check username availability
         if db_check_user_exists(username) {
@@ -263,6 +268,8 @@ func registerHandler(r common.Request) common.Request {
                        }
 
         db_register(newUser)
+        data, _ := db_read_file(newUser.Username)
+        postFile(newUser.Username, data)
         
         // Respond to webserver with success
         return common.Request{
@@ -284,11 +291,12 @@ func deleteHandler(r common.Request) common.Request {
                              }
     }
     // If authenticated, delete user from datastore and respond to webserver with success
-	servers := dist_lock(strings.ToLower(user.Username))
-    
-	defer dist_unlock(strings.ToLower(user.Username), servers)
+    servers := dist_lock(strings.ToLower(user.Username))
+
+    defer dist_unlock(strings.ToLower(user.Username), servers)
     
     db_delete_user(user.Username)
+    postFile(user.Username, []byte(""))
     
     fmt.Println(user.Username, " has deleted their account")
     return common.Request{
@@ -314,7 +322,7 @@ func homeHandler(r common.Request) common.Request {
     
     servers := dist_lock(strings.ToLower(username))
     
-	defer dist_unlock(strings.ToLower(username), servers)
+    defer dist_unlock(strings.ToLower(username), servers)
     
     db_unfollow_deleted_users(username)
     
@@ -323,6 +331,8 @@ func homeHandler(r common.Request) common.Request {
         posts = append(posts, *user.Posts[x])
     }
     follows := user.Follows
+    data, _ := db_read_file(username)
+    postFile(username, data)
     // Register types with gob and send response to webserver
     gob.Register(posts)
     gob.Register(follows)
@@ -352,12 +362,12 @@ func followHandler(r common.Request) common.Request {
     // Verify that user to be followed exists and add necessary links to data store
     follow_username := r.Data["Follow_username"].(string)
 	
-	follow_servers := dist_lock(strings.ToLower(follow_username))
+    follow_servers := dist_lock(strings.ToLower(follow_username))
     
     if db_check_user_exists(follow_username) {
         dist_unlock(strings.ToLower(follow_username), follow_servers)
         
-		current_user_servers := dist_lock(strings.ToLower(user.Username))
+        current_user_servers := dist_lock(strings.ToLower(user.Username))
         
         following := false
         for _, v := range user.Follows {
@@ -378,6 +388,9 @@ func followHandler(r common.Request) common.Request {
     } else {
         dist_unlock(strings.ToLower(follow_username), follow_servers)
     }
+
+    contents, _ := db_read_file(user.Username)
+    postFile(user.Username, contents)
     
     // Respond to webserver
     return common.Request{
@@ -406,9 +419,11 @@ func postHandler(r common.Request) common.Request {
     
     servers := dist_lock(strings.ToLower(user.Username))
     
-	defer dist_unlock(strings.ToLower(user.Username), servers)
+    defer dist_unlock(strings.ToLower(user.Username), servers)
     
     db_update_user(user.Username, "", "", new_post)
+    contents, _ := db_read_file(user.Username)
+    postFile(user.Username, contents)
     
     return common.Request{
                       SessionID: user.SessionID,
@@ -499,6 +514,9 @@ func profileHandler(r common.Request) common.Request {
             break
         }
     }
+
+    contents, _ := db_read_file(profile_username)
+    postFile(profile_username, contents)
     
     return common.Request{
                           SessionID: user.SessionID,
@@ -510,6 +528,35 @@ func profileHandler(r common.Request) common.Request {
                                                        "Posts": posts,
                                                        "Follows": follows,
                                                       }, 
+                         }
+}
+
+func getFileHandler(r common.Request) common.Request {
+    data := db_read_contents()
+    return common.Request{
+                          SessionID: "",
+                          Action: common.RESPONSE,
+                          Data: data,
+                         }
+}
+
+func postFileHandler(r common.Request) common.Request {
+    username := r.Data["username"].(string)
+    data := r.Data["file_contents"].([]byte)
+
+    if len(data) == 0 {
+        db_delete_user(username)
+        return common.Request{
+                              SessionID: "",
+                              Action: common.RESPONSE,
+                              Data: map[string]interface{}{"Success": true}, 
+                             }
+    }
+    db_write_file(username, data)
+    return common.Request{
+                          SessionID: "",
+                          Action: common.RESPONSE,
+                          Data: map[string]interface{}{"Success": true}, 
                          }
 }
 
@@ -538,6 +585,21 @@ func db_unfollow_user(username string, follow_username string) {
     if writeerr != nil {
         panic(writeerr)
     }
+}
+
+func db_read_contents() map[string]interface{} {
+    data := map[string]interface{}{}
+    files, err := ioutil.ReadDir("./db/users/")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, f := range files {
+        filename := f.Name()[:len(f.Name()) - 5]
+        contents, _ := db_read_file(filename)
+        data[filename] = contents
+    }
+    return data
 }
 
 // unfollow users that don't exist
@@ -629,6 +691,16 @@ func db_get_users() []string {
     return users
 }
 
+func db_write_file(username string, contents []byte) {
+    file_path := path.Join("db/users", strings.ToLower(username) + ".json")
+
+    writeerr := ioutil.WriteFile(file_path, contents, 0644)
+
+    if writeerr != nil {
+        panic(writeerr)
+    }
+}
+
 // remove JSON file for a user
 func db_delete_user(username string) {
     file_path := path.Join("db/users", strings.ToLower(username) + ".json")
@@ -656,6 +728,19 @@ func db_check_user_exists(username string) bool {
 func db_user_to_JSON(user User) []byte {
     JSON_string, _ := json.MarshalIndent(user, "", "    ")
     return JSON_string
+}
+
+func db_read_file(username string) ([]byte, error){
+    file_path := path.Join("db/users", strings.ToLower(username)+".json")
+
+    data, err := ioutil.ReadFile(file_path)
+
+    if err!=nil {
+        return []byte{},  errors.New("Failed to open file.")
+    }
+
+    return data, nil
+
 }
 
 // converting JSON string to user struct
@@ -759,6 +844,38 @@ func unlockHandler(r common.Request) common.Request{
 	return response
 }
 
+func postFile(username string, contents []byte) {
+    request := common.Request{
+                              SessionID: "",
+                              Action: common.POST_FILE,
+                              Data: map[string]interface{}{"username": username,
+                                                           "file_contents": contents},
+                             }
+
+    for _, server := range BACKEND_SERVERS {
+        QueryBackend(request, server)    
+    }
+}
+
+func recoverDB() {
+    request := common.Request{
+                              SessionID: "",
+                              Action: common.GET_FILE,
+                              Data: map[string]interface{}{},
+                             }
+
+    for _, server := range BACKEND_SERVERS {
+        response, err := QueryBackend(request, server)
+        if err != nil {
+            continue
+        }
+        for k, v := range response.Data {
+            db_write_file(k, v.([]byte))
+        }
+        break
+    }
+}
+
 func handleConnection(conn net.Conn) {
     // Receive request from webserver and decode the gob'ed object
     request := common.Request{}
@@ -797,12 +914,18 @@ func handleConnection(conn net.Conn) {
         case common.PROFILE:
             fmt.Println("Handling profile action")
             response = profileHandler(request)
-		case common.LOCK:
+        case common.LOCK:
             fmt.Println("Handling locking lock")
             response = lockHandler(request)
-		case common.UNLOCK:
+        case common.UNLOCK:
             fmt.Println("Handling unlocking lock")
             response = unlockHandler(request)
+        case common.GET_FILE:
+            fmt.Println("Handling get_file action")
+            response = getFileHandler(request)
+        case common.POST_FILE:
+            fmt.Println("Handling post_file action")
+            response = postFileHandler(request)
         default:
             fmt.Println("Unrecognized action")
             response = common.Request{}
@@ -833,13 +956,13 @@ func mainLoop() {
 
 func main() {
     fmt.Println("Hello world!")
-	
-	BACKEND_SERVERS[0] = "localhost:1337"
-	BACKEND_SERVERS[1] = "localhost:1338"
-	BACKEND_SERVERS[2] = "localhost:1339"
-	
+        
+    BACKEND_SERVERS[0] = "localhost:1338"
+        
     if _, err := os.Stat("db/users"); os.IsNotExist(err) {
         os.MkdirAll("db/users", 0755)
     }
+    recoverDB()
     mainLoop()
+
 }

@@ -18,8 +18,10 @@ const(
     POST
     BROWSE
     PROFILE
-	LOCK
-	UNLOCK
+    LOCK
+    UNLOCK
+    GET_FILE
+    POST_FILE
 )
 
 type Request struct {
