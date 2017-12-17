@@ -89,10 +89,10 @@ func AuthenticateFetch(fullSessionID string) (User, error) {
 
     // Extract username from the session id
     username := fullSessionID[:len(fullSessionID) - (COOKIE_LENGTH * 2 + 1)]
-    file_lock := get_lock(strings.ToLower(username))
-
-    file_lock.Lock()
-    defer file_lock.Unlock()
+    
+	servers := dist_lock(strings.ToLower(username))
+    
+	defer dist_unlock(strings.ToLower(username), servers)
     
     if !db_check_user_exists(username) {
         return User{}, errors.New(USER_NX)
@@ -137,9 +137,9 @@ func loginHandler(r common.Request) common.Request {
         
         username := r.Data["Username"].(string)
         
-        file_lock := get_lock(strings.ToLower(username))
-        file_lock.Lock()
-        defer file_lock.Unlock()
+        servers := dist_lock(strings.ToLower(username))
+    
+		defer dist_unlock(strings.ToLower(username), servers)
         
         if !db_check_user_exists(username) {
             return common.Request{
@@ -187,10 +187,10 @@ func logoutHandler(r common.Request) common.Request {
                              }
     }
     // Otherwise, set stored SessionID to empty string and send success to webserver
-    file_lock := get_lock(strings.ToLower(user.Username))
-
-    file_lock.Lock()
-    defer file_lock.Unlock()
+	servers := dist_lock(strings.ToLower(user.Username))
+    
+	defer dist_unlock(strings.ToLower(user.Username), servers)
+    
     db_update_user(user.Username, "", "", Post{})
     
     return common.Request{
@@ -223,10 +223,9 @@ func registerHandler(r common.Request) common.Request {
         username := r.Data["Username"].(string)
         password := r.Data["Password"].(string)
         
-        file_lock := get_lock(strings.ToLower(username))
-
-        file_lock.Lock()
-        defer file_lock.Unlock()
+        servers := dist_lock(strings.ToLower(username))
+    
+		defer dist_unlock(strings.ToLower(username), servers)
         
         // Check username availability
         if db_check_user_exists(username) {
@@ -285,10 +284,10 @@ func deleteHandler(r common.Request) common.Request {
                              }
     }
     // If authenticated, delete user from datastore and respond to webserver with success
-    file_lock := get_lock(strings.ToLower(user.Username))
-
-    file_lock.Lock()
-    defer file_lock.Unlock()
+	servers := dist_lock(strings.ToLower(user.Username))
+    
+	defer dist_unlock(strings.ToLower(user.Username), servers)
+    
     db_delete_user(user.Username)
     
     fmt.Println(user.Username, " has deleted their account")
@@ -313,10 +312,9 @@ func homeHandler(r common.Request) common.Request {
     // Build response for webserver with user's posts and follows
     username := user.Username
     
-    file_lock := get_lock(strings.ToLower(username))
-
-    file_lock.Lock()
-    defer file_lock.Unlock()
+    servers := dist_lock(strings.ToLower(username))
+    
+	defer dist_unlock(strings.ToLower(username), servers)
     
     db_unfollow_deleted_users(username)
     
@@ -353,15 +351,13 @@ func followHandler(r common.Request) common.Request {
     
     // Verify that user to be followed exists and add necessary links to data store
     follow_username := r.Data["Follow_username"].(string)
-
-    file_lock_follow_user := get_lock(strings.ToLower(follow_username))
-    file_lock_follow_user.Lock()
+	
+	follow_servers := dist_lock(strings.ToLower(follow_username))
     
     if db_check_user_exists(follow_username) {
-        file_lock_follow_user.Unlock()
+        dist_unlock(strings.ToLower(follow_username), follow_servers)
         
-        file_lock_current_user := get_lock(strings.ToLower(user.Username))
-        file_lock_current_user.Lock()
+		current_user_servers := dist_lock(strings.ToLower(user.Username))
         
         following := false
         for _, v := range user.Follows {
@@ -377,10 +373,10 @@ func followHandler(r common.Request) common.Request {
             // Follow them
             db_update_user(user.Username, user.SessionID, follow_username, Post{})
         }
-        file_lock_current_user.Unlock()
+        dist_unlock(strings.ToLower(user.Username), current_user_servers)
         
     } else {
-        file_lock_follow_user.Unlock()
+        dist_unlock(strings.ToLower(follow_username), follow_servers)
     }
     
     // Respond to webserver
@@ -408,10 +404,10 @@ func postHandler(r common.Request) common.Request {
                      Timestr: time.Now().Format("Jan 2 2006: 3:04 pm"),
                     }
     
-    file_lock := get_lock(strings.ToLower(user.Username))
-
-    file_lock.Lock()
-    defer file_lock.Unlock()
+    servers := dist_lock(strings.ToLower(user.Username))
+    
+	defer dist_unlock(strings.ToLower(user.Username), servers)
+    
     db_update_user(user.Username, "", "", new_post)
     
     return common.Request{
@@ -466,9 +462,9 @@ func profileHandler(r common.Request) common.Request {
     
     profile_username := r.Data["Profile_user"].(string)
     
-    file_lock := get_lock(strings.ToLower(profile_username))
-    file_lock.Lock()
-    defer file_lock.Unlock()
+	servers := dist_lock(strings.ToLower(profile_username))
+    
+	defer dist_unlock(strings.ToLower(profile_username), servers)
     
     // Check if the requested user actually exists
     if !db_check_user_exists(profile_username) {
@@ -695,6 +691,7 @@ func dist_lock(key string) []string{
                       Data: map[string]interface{}{"key": key},
                      }
 	
+	// will return list of servers that responded for unlocking later
 	servers := []string{}
 	
 	// tell all backend servers (except yourself) to lock, and wait for them to respond or timeout
@@ -709,30 +706,57 @@ func dist_lock(key string) []string{
 		}
 	}
 	
+	// lock file yourself after all servers respond they've locked
+	file_lock := get_lock(key)
+	file_lock.Lock()
+	
 	return servers
 }
 
-func dist_unlock(lock *sync.Mutex) {
-	
-}
-
-func lockHandler(lock *sync.Mutex) common.Request{
-    
+func dist_unlock(key string, servers []string) {
 	query := common.Request{
                       SessionID: "",
-                      Action: common.LOCK,
-                      Data: map[string]interface{}{"lock": lock},
+                      Action: common.UNLOCK,
+                      Data: map[string]interface{}{"key": key},
                      }
-	return query
+	
+	// tell all backend servers (except yourself) to unlock, and wait for them to respond or timeout
+	for _, server := range servers {
+		if server != BACKEND_LOC{
+			response, err := QueryBackend(query, server)
+			if err != nil || !response.Data["OK"].(bool) {
+				fmt.Println("Unlock error on server: " + server)
+			}
+		}
+	}
+	
+	// unlock file yourself after all servers respond they've unlocked
+	file_lock := get_lock(key)
+	file_lock.Unlock()
 }
 
-func unlockHandler(lock *sync.Mutex) common.Request{
-    query := common.Request{
+func lockHandler(r common.Request) common.Request{
+    file_lock := get_lock(strings.ToLower(r.Data["key"].(string)))
+    file_lock.Lock()
+	
+	response := common.Request{
                       SessionID: "",
-                      Action: common.UNLOCK,
-                      Data: map[string]interface{}{"lock": lock},
+                      Action: common.RESPONSE,
+                      Data: map[string]interface{}{"OK": true},
                      }
-	return query
+	return response
+}
+
+func unlockHandler(r common.Request) common.Request{
+	file_lock := get_lock(strings.ToLower(r.Data["key"].(string)))
+    file_lock.Unlock()
+	
+    response := common.Request{
+                      SessionID: "",
+                      Action: common.RESPONSE,
+                      Data: map[string]interface{}{"OK": true},
+                     }
+	return response
 }
 
 func handleConnection(conn net.Conn) {
@@ -775,10 +799,10 @@ func handleConnection(conn net.Conn) {
             response = profileHandler(request)
 		case common.LOCK:
             fmt.Println("Handling locking lock")
-            //response = lockHandler(request)
+            response = lockHandler(request)
 		case common.UNLOCK:
             fmt.Println("Handling unlocking lock")
-            //response = unlockHandler(request)
+            response = unlockHandler(request)
         default:
             fmt.Println("Unrecognized action")
             response = common.Request{}
