@@ -7,18 +7,21 @@ import (
     "strings"
     "time"
     "html/template"
-    "math/rand"
     "log"
     "net"
     "net/http"
     "path"
     "./common"
+	"math/rand"
 )
 
 const PROTOCOL = "tcp"
 const BACKEND_ADDR = "localhost"
 const BACKEND_PORT = "1337"
-const BACKEND_LOC = BACKEND_ADDR + ":" + BACKEND_PORT
+const BACKEND_PORT2 = "1338"
+const BACKEND_PORT3 = "1339"
+
+var BACKEND_SERVERS [3]string
 
 const COOKIE_LENGTH = 25
 
@@ -40,11 +43,22 @@ type User struct {
     Posts []*Post
 }
 
+func random(min int, max int) int {
+    return rand.Intn(max-min) + min
+}
+
 func QueryBackend(r common.Request) (common.Request, error){
     fmt.Println("Querying backend")
     fmt.Println(r)
+	
+	// Randomly choose a backend server to query
+	rand.Seed(time.Now().UnixNano())
+    randomNum := random(0, len(BACKEND_SERVERS))
 
-    conn, err := net.Dial(PROTOCOL, BACKEND_LOC)
+    conn, err := net.Dial(PROTOCOL, BACKEND_SERVERS[randomNum])
+	
+	fmt.Println(BACKEND_SERVERS[randomNum])
+	
     if err != nil {
         fmt.Println("Connection error")
         return common.Request{}, errors.New(BACKEND_ERR)
@@ -170,7 +184,6 @@ func register(w http.ResponseWriter, r *http.Request) {
                                                             "Method": r.Method}}
         response, err := QueryBackend(query)
         if err != nil {
-            fmt.Println(BACKEND_LOC)
             t, err := template.ParseFiles("register.html")
             if err != nil {
                 log.Fatal("registration: ", err)
@@ -559,6 +572,10 @@ func delete_account(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	BACKEND_SERVERS[0] = BACKEND_ADDR + ":" + BACKEND_PORT
+	BACKEND_SERVERS[1] = BACKEND_ADDR + ":" + BACKEND_PORT2
+	BACKEND_SERVERS[2] = BACKEND_ADDR + ":" + BACKEND_PORT3
+	
     posts := make([]Post, 0)
     follows := make([]string, 0)
     gob.Register(posts)

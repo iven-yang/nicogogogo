@@ -45,5 +45,6 @@ Our application data server operates off of a single file per user object that g
 7. The handler function performs any read and write operations on the locked file.
 8. The handler calls an unlocking function that tells all other backend servers that responded during the distributed locking phase (parts 5-6) to release the lock for the file that was modified.
 9. After all other backend servers either timeout during the request or respond that they have released the lock, the unlocking function releases the lock and the handler function responds to the connection request that was accepted.
+10. Files are synced whenever a file is modified on one backend server (while all the servers have locks on that file)
 
 With this data flow, only one handler function, and thus one goroutine, can operate on a given user file at any point in time. Additionally, handler functions are limited to acquiring only a single lock at any point in their execution to avoid deadlocks that may be caused by context switches. 
