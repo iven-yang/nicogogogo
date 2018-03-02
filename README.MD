@@ -22,18 +22,8 @@ The structure of the files that the application data server will use
 ---------------------------------------------------------------------
 Data is stored in the `db/users` directory. Each user gets its own json file. Whenever an update is required for a user, that user's json file gets updated accordingly.
 
-Modifications to the user interface from the first part (made in part two)
---------------------------------------------------------------------------
-Added missing components (profile for easiness to view a specific user's messages, ability to delete account, enforcing of 100 character message limit).
-
-Modifications to the application data server (made in part three)
------------------------------------------------------------------
-1. Main loop modified to start a new goroutine to handle each individual connection
-2. Global map of usernames to mutexes created for file locking to avoid race conditions between operations
-3. Fixed an error that caused the backend server to crash when browsing profiles from a newly created account
-
-Avoiding race conditions (updated for part 4)
----------------------------------------------
+Avoiding race conditions 
+------------------------
 Our application data server operates off of a single file per user object that gets created. Due to this, we do not need to lock the entire database anytime a transaction takes place. Instead, we can lock the user file(s) that will be read and modified in each request handler function. To do this, we created a global map `mutexes` that maps usernames to individual locks. The flow for a typical request to the application data server now looks as follows:
 
 1. The application data server listens for connections.
